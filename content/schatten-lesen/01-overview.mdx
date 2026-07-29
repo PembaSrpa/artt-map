@@ -1,0 +1,49 @@
+---
+title: Overview
+order: 1
+---
+
+## What this app does
+
+**Schatten Lesen** ("Shadow Reading") is a reading app that teaches German by hiding vocabulary inside stories the reader actually wants to read. Chapters are stored as Markdown files with inline `{word|type|translation|example}` tags; the app renders the English prose with the tagged German words colour-coded and tappable, alongside two other reading modes (side-by-side parallel text, and short graded German stories with vocab lists and quizzes). It also bundles a separate PDF reader for a personal library of reference PDFs — trading, Python, data-analysis, and machine-learning books, plus a handful of German study PDFs (a personal reading book and A1/A2 glossary and grammar references) that get their own `Deutsch` bucket alongside the technical ones.
+
+## Tech stack
+
+| Layer | Choice | Why (inferred from code) |
+|---|---|---|
+| Framework | **Next.js 16** (App Router), `output: 'export'` (see `next.config.js`) | Statically exports the whole site (`out/`) so it can be hosted on Vercel *and* wrapped as a native app — there is no server/API at runtime. |
+| UI | **React 19** + **Tailwind CSS 3** | Utility-first styling; all components are hand-built, no component library except a few `shadcn`-style primitives are notably absent (icons come from `@tabler/icons-react` instead). |
+| Animation | **motion** (`motion/react`, the Framer Motion successor) | Used for header hover springs and the parallel-reader "warp" paragraph-flip transition. |
+| Content parsing | Hand-rolled regex/line parsers in `lib/parseChapter.ts`, `lib/parseParallelChapter.ts`, `lib/parseGradedChapter.ts` | No markdown/MDX library — chapters use a small custom dialect, not full Markdown, so a bespoke parser was simpler than adopting a generic one. |
+| PDF rendering | **pdfjs-dist** | Renders trading/ML reference PDFs to `<canvas>` client-side; no server-side PDF processing. |
+| Native shell | **Capacitor** (`@capacitor/core`, `@capacitor/android`, `@capacitor/app`, `@capacitor-community/text-to-speech`) | Wraps the static export as an Android app (see `android/`), adds hardware back-button handling and native TTS. |
+| Persistence | Browser `localStorage` only, wrapped by `lib/storage.ts` and `lib/settings.ts` | No backend, no database, no accounts — "no account needed" is a stated design goal (see `README.md`). |
+| Analytics | `@vercel/analytics`, mounted only when *not* running inside the native shell (`components/WebOnlyAnalytics.tsx`) | Analytics is meaningless inside the Capacitor app since there's no Vercel edge network there. |
+
+## How to run it locally
+
+```bash
+npm install                # also runs scripts/copy-pdf-worker.js via postinstall
+npm run dev                # next dev — local dev server
+npm run build               # next build — static export to /out (output: 'export')
+npm run start                # next start (rarely used, since the app is statically exported)
+```
+
+No environment variables are required — there is no `.env.example` in the repo and no server-side code that reads `process.env` for secrets. The only "build step" beyond `next build` is `scripts/copy-pdf-worker.js`, which copies the `pdfjs-dist` worker file into `public/` so the PDF reader can load it at a fixed URL.
+
+To rebuild the Android APK after changes, `scripts/build-apk.py` chains `npm run build` → `npx cap sync android` → `gradlew assembleDebug/assembleRelease`. Note: this script hardcodes `PROJECT_ROOT = C:\Projects\schatten-lesen`, so it only works on the original author's machine as-is.
+
+## Folder structure
+
+| Folder | Purpose |
+|---|---|
+| `app/` | Next.js App Router pages: home library, novel detail pages, chapter reader pages, and the separate "technical books" (PDF) section. |
+| `components/` | All React components — reader UIs for the three novel types, the PDF reader, shared chrome (headers, settings panel), and React Context providers for bookmarking, narration, settings, and the tutorial overlay. |
+| `lib/` | Framework-free logic: chapter parsing, `localStorage` read/write helpers, settings validation, text-to-speech wrappers, tutorial copy, and the book-genre bucketing helper. |
+| `content/` | The actual novel/story text, one folder per novel (`content/<contentFolder>/chapter-N.md`), in the app's custom annotation dialect. |
+| `public/` | Static assets served as-is: cover images (`public/covers/`), the technical-book PDFs (`public/books/`), the `pdfjs` worker script, favicon, and a README screenshot. |
+| `android/` | The Capacitor-generated native Android project (Gradle project, manifest, icons, splash screens) that wraps the static web export. |
+| `scripts/` | Standalone Node/Python utility scripts: copying the PDF worker at install time, scaffolding new `shadow-slave` chapter files, rebuilding the APK, and a `git add/commit/push` helper. |
+| `novels.config.ts` / `books.config.ts` (root) | The two static catalogs that drive the whole app — every novel and every technical book is a hand-written entry in one of these two files. |
+
+> ⚠️ Unclear: there is no `next-env.d.ts`, `.env.example`, or CI config in the archive, so build/deploy automation (e.g. how the Vercel deployment is triggered) isn't visible from the code alone.

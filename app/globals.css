@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+:root {
+  --n-800: #262626;
+  --n-700: #404040;
+  --n-300: #d4d4d4;
+  --n-200: #e5e5e5;
+
+  --background: var(--n-800);
+  --foreground: var(--n-200);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-n-800: var(--n-800);
+  --color-n-700: var(--n-700);
+  --color-n-300: var(--n-300);
+  --color-n-200: var(--n-200);
+
+  --font-sans: "Inter", sans-serif;
+  --font-mono: "Fira Code", monospace;
+  --font-display: "Fira Code", monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background: rgba(229, 229, 229, 0.18);
+}
+
+/* thin neutral scrollbar */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--n-700) transparent;
+}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-thumb { background: var(--n-700); border-radius: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* rehype-pretty-code base styling */
+[data-rehype-pretty-code-fragment] {
+  position: relative;
+}
+[data-rehype-pretty-code-fragment] pre {
+  padding: 16px;
+  overflow-x: auto;
+  font-size: 13px;
+  line-height: 1.7;
+  background: transparent !important;
+}
+[data-rehype-pretty-code-fragment] code {
+  display: grid;
+  counter-reset: line;
+}
+[data-line] {
+  padding: 0 4px;
+}
