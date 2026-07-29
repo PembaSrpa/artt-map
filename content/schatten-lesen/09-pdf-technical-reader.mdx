@@ -1,6 +1,6 @@
 ---
 title: Technical Books (PDF Reader)
-order: 4
+order: 9
 ---
 
 ## What it does
@@ -17,7 +17,7 @@ order: 4
 - `app/technical/[bookId]/page.tsx` — per-book route; `generateStaticParams()` pre-renders one page per book, `dynamicParams = false` means any `bookId` not in `books.config.ts` 404s at request time rather than attempting an on-demand render.
 - `components/PdfReaderClient.tsx` — the actual PDF viewer: header/footer chrome, `PaginatedReader` and `ContinuousReader` sub-components.
 - `public/books/*.pdf` — the PDF files themselves, served as static assets.
-- `public/pdf.worker.min.mjs` — the `pdfjs-dist` worker script, copied here at `npm install` time by `scripts/copy-pdf-worker.js` (see `docs/overview.md`).
+- `public/pdf.worker.min.mjs` — the `pdfjs-dist` worker script, copied here at `npm install` time by `scripts/copy-pdf-worker.js` (see [Overview](/docs/schatten-lesen/overview)).
 
 ## How it connects
 

@@ -1,6 +1,6 @@
 ---
 title: File Reference
-order: 5
+order: 10
 ---
 
 Flat reference of every source file (excluding `content/*.md` chapter files, `public/books/*.pdf`, `public/covers/*`, generated Android resource binaries, and `node_modules`/`package-lock.json`). Paths are relative to the project root.
@@ -35,7 +35,7 @@ Flat reference of every source file (excluding `content/*.md` chapter files, `pu
 | File | Purpose | Imports from | Imported by |
 |---|---|---|---|
 | `lib/getChapters.ts` | Filesystem access to `content/`: list chapters (`getChapterList`), read one chapter's raw text (`getChapterRaw`). | `fs`, `path` | `app/page.tsx`, `app/[novelId]/page.tsx`, `app/[novelId]/[chapterId]/page.tsx` |
-| `lib/parseChapter.ts` | Base chapter parser: headings/paragraphs/tables/dividers, inline `{word\|type\|translation\|example}` annotations. | — | `app/[novelId]/[chapterId]/page.tsx`, `lib/parseGradedChapter.ts`, `components/ChapterRenderer.tsx`, `components/GermanWord.tsx` (types), `lib/narration.ts` (types) |
+| `lib/parseChapter.ts` | Base chapter parser: headings/paragraphs/tables/dividers, inline `{word / type / translation / example}` annotations. | — | `app/[novelId]/[chapterId]/page.tsx`, `lib/parseGradedChapter.ts`, `components/ChapterRenderer.tsx`, `components/GermanWord.tsx` (types), `lib/narration.ts` (types) |
 | `lib/parseParallelChapter.ts` | Parser for `DE:`/`EN:` paragraph-pair chapters. | — | `app/[novelId]/[chapterId]/page.tsx`, `components/ParallelChapterRenderer.tsx`, `components/ParallelParagraph.tsx` (types), `lib/narration.ts` (types) |
 | `lib/parseGradedChapter.ts` | Parser for graded chapters: splits story/vocab/quiz sections, delegates story to `parseChapter`. | `lib/parseChapter.ts` | `app/[novelId]/[chapterId]/page.tsx`, `components/GradedReaderClient.tsx`, `components/VocabList.tsx` (types), `components/QuizSection.tsx` (types) |
 | `lib/narration.ts` | Converts parsed chapter lines into flat narratable text segments for TTS. | `lib/parseChapter.ts` (types), `lib/parseParallelChapter.ts` (types), `lib/settings.ts` (types) | `components/ReaderClient.tsx`, `components/ParallelReaderClient.tsx`, `components/GradedReaderClient.tsx` |

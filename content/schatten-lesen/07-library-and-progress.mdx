@@ -1,6 +1,6 @@
 ---
 title: Library Home & Reading Progress
-order: 2
+order: 7
 ---
 
 ## What it does
@@ -14,7 +14,7 @@ order: 2
 - `app/page.tsx` — the home page: server component, maps `novels.config.ts` to cards, embeds `ContinueToBookmark`, `HomeHeader`, `GlareCard` (the "Read Educational Books" tile).
 - `app/[novelId]/page.tsx` — novel detail page: cover, metadata, genre chips, description, chapter list, embeds `NovelPageClient`.
 - `components/NovelPageClient.tsx` — "Continue Ch. N" / "From start" / "Start reading" button logic.
-- `components/ContinueToBookmark.tsx` — home-page bookmark card (see `docs/features/bookmarking.md` for the bookmark mechanism itself).
+- `components/ContinueToBookmark.tsx` — home-page bookmark card (see [Word Bookmarking](/docs/schatten-lesen/word-bookmarking) for the bookmark mechanism itself).
 - `components/ProgressTracker.tsx` — invisible component mounted inside every reader page that records "you're currently on chapter N" as a side effect.
 - `lib/storage.ts` — `getLastChapter` / `setLastChapter` / `getLastUpdated`, and `PROGRESS_EXCLUDED_IDS`.
 - `components/GlareCard.tsx` — the animated starfield card used as the "Read Educational Books" tile on the home page.
@@ -36,7 +36,7 @@ flowchart TB
 ```
 
 - Connects to: `app/page.tsx` reads `novels.config.ts` directly and calls `getChapterList` (from `lib/getChapters.ts`) per novel just to compute `chapterCount` (which is fetched but **not actually rendered anywhere** on the card — see Gotchas). `NovelPageClient` and `ContinueToBookmark` both re-read their respective storage on every `pathname` change via `usePathname()`, so returning to these pages after reading always reflects the latest state.
-- Connected from: `ProgressTracker` is the only writer of reading-progress state; it's mounted once per reader client component (`ReaderClient`, `ParallelReaderClient`, `GradedReaderClient` — not `PdfReaderClient`, which tracks its own page/scroll position instead, see `docs/features/pdf-technical-reader.md`).
+- Connected from: `ProgressTracker` is the only writer of reading-progress state; it's mounted once per reader client component (`ReaderClient`, `ParallelReaderClient`, `GradedReaderClient` — not `PdfReaderClient`, which tracks its own page/scroll position instead, see [Technical Books (PDF Reader)](/docs/schatten-lesen/pdf-technical-reader)).
 
 ## Key functions/components
 
