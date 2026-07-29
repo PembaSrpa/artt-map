@@ -1,0 +1,39 @@
+---
+title: Progress & Resume
+order: 4
+---
+
+There is no backend - all state that survives an app restart lives in `@react-native-async-storage/async-storage`, under plain string keys defined in `store/`. `store/progressStore.ts` and `store/uiStore.ts` are not state-management libraries in the Redux/Zustand sense; they are just typed key constants and key-builder functions that every screen imports so key strings are never hand-typed twice.
+
+## Score tracking (German Artikel only)
+
+`store/progressStore.ts` defines a single key, `cards_german_progress` (`STORAGE_KEYS.GERMAN_PROGRESS`), storing a JSON-serialized `GermanProgressMap` - a `{ [wordId]: { correct, incorrect } }` object covering every German word ever answered, across all levels.
+
+`hooks/useProgress.ts` loads this map once on mount and exposes:
+
+- `recordGermanAnswer(id, wasCorrect)` - merges one word's result into the map, updates React state, and persists the whole map back to AsyncStorage.
+- `getGermanScore(level, levelWordIds)` - reduces the in-memory map down to just the word IDs passed in, used by `app/german/index.tsx`'s level cards to show a per-level accuracy percentage.
+
+Only the German Artikel module tracks correct/incorrect scoring. Glossar and IELTS modules track review *position* only (see below), not right/wrong answers, since they are flip-to-reveal cards rather than a guessing game.
+
+## "Continue where you left off"
+
+`store/uiStore.ts` defines two flavors of resume state:
+
+**Fixed keys** (`UI_STORAGE_KEYS`) - one "last used" value per module, written whenever a flashcards screen's `index` changes:
+
+| Key | Set by |
+| --- | --- |
+| `cards_ui_last_ielts_section`, `cards_ui_last_ielts_index` | `app/ielts/[group]/[section]/flashcards.tsx` |
+| `cards_ui_last_german_level`, `..._index`, `..._score`, `..._streak` | `app/german/[level].tsx` |
+| `cards_ui_last_glossar_level`, `..._kapitel`, `..._module`, `..._index` | `app/glossar/[level]/[kapitel]/flashcards.tsx` and the B2 equivalent |
+
+`app/index.tsx` reads all of these on focus (`useFocusEffect`) to render each module's "Continue ..." button, and builds the correct deep link for the German module vs. the Glossar module (which branches on whether `glossarModule` is set to decide between the B2 and non-B2 flashcards path - see `02-navigation-and-routing.mdx`).
+
+**Per-list keys** (`ieltsListIndexKey(section)` and `glossarListIndexKey(level, kapitel, moduleId?)`) - functions that build a unique key per section/Kapitel/Module, e.g. `cards_ui_glossar_list_index_B2_3_m2`. Every list screen (the word-list screens, not the flashcards screens) reads its own key on focus to decide whether to show "Start Flashcards" or "Continue (`N` / `total`)".
+
+> ⚠️ Unclear: the fixed `UI_STORAGE_KEYS` (used for the home screen) and the per-list `...ListIndexKey` values (used for each list screen) are written independently in the same `useEffect` in each flashcards screen, so they always describe the same position for a given section/Kapitel/Module - but this is duplication rather than a single source of truth. When a Glossar Kapitel's flashcards screen is left, `LAST_GLOSSAR_MODULE` is explicitly cleared with `AsyncStorage.removeItem`; the B2 flashcards screen sets it instead. This is how the home screen's Glossar "Continue" button knows whether to deep-link into the B2 or non-B2 route.
+
+## Theme persistence
+
+Light/dark mode is stored separately under its own key (`cards_theme_mode`) inside `theme/ThemeContext.tsx` - see `05-theming-and-typography.mdx`.

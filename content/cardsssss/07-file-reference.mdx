@@ -1,0 +1,61 @@
+---
+title: File Reference
+order: 7
+---
+
+Covers `app/`, `components/`, `hooks/`, `store/`, `theme/`, and `constants/`. Asset/data JSON files are covered by pattern in `03-vocabulary-data.mdx` rather than listed individually here.
+
+| File | Purpose | Imports from | Imported by |
+| --- | --- | --- | --- |
+| `app/_layout.tsx` | Root `Stack` navigator, font loading, splash screen, wraps app in `GestureHandlerRootView` + `ThemeProvider` | `theme/ThemeContext` | Expo Router (entry layout) |
+| `app/index.tsx` | Home screen - three module cards + "Continue" resume shortcuts | `components/Scales`, `components/ThemeToggle`, `hooks/useIELTSData`, `store/uiStore`, `theme/ThemeContext`, `theme/typography` | Expo Router (`/`) |
+| `app/creators.tsx` | Credits screen - links to creators' portfolios and other projects | `components/NavBar`, `components/Scales`, `components/ThemeToggle`, `theme/ThemeContext`, `theme/typography` | Expo Router (`/creators`) |
+| `app/modal.tsx` | Starter-template modal screen, not linked from the app's real flow | `components/themed-text`, `components/themed-view` | Expo Router (`/modal`, unreferenced) |
+| `app/(tabs)/_layout.tsx` | Starter-template bottom-tab navigator | `components/haptic-tab`, `components/ui/icon-symbol`, `constants/theme`, `hooks/use-color-scheme` | Expo Router (`/(tabs)`, unreferenced) |
+| `app/(tabs)/index.tsx` | Starter-template "Welcome" tab screen | `components/hello-wave`, `components/parallax-scroll-view`, `components/themed-text`, `components/themed-view` | `app/(tabs)/_layout.tsx` |
+| `app/(tabs)/explore.tsx` | Starter-template "Explore" tab screen | `components/ui/collapsible`, `components/external-link`, `components/parallax-scroll-view`, `components/themed-text`, `components/themed-view`, `components/ui/icon-symbol`, `constants/theme` | `app/(tabs)/_layout.tsx` |
+| `app/german/index.tsx` | Deutsch Artikel level picker with per-level accuracy | `hooks/useGermanData`, `hooks/useProgress`, `store/uiStore`, shared chrome components | Expo Router (`/german`) |
+| `app/german/[level].tsx` | Deutsch Artikel swipe game screen | `components/ArtikelCard`, `components/StatChip`, `hooks/useGermanData`, `hooks/useProgress`, `store/uiStore`, shared chrome components | Expo Router (`/german/[level]`) |
+| `app/glossar/index.tsx` | Glossar level picker (A1/A1_OLD/A2/B1/B2) | `hooks/useGlossarData`, shared chrome components | Expo Router (`/glossar`) |
+| `app/glossar/[level]/index.tsx` | Glossar Kapitel list for a level; routes to B2 sub-tree if `isB2Level` | `hooks/useGlossarData`, `constants/glossarKapitelTitles`, shared chrome components | Expo Router (`/glossar/[level]`) |
+| `app/glossar/[level]/[kapitel]/index.tsx` | Word list for one non-B2 Kapitel; resume state via `glossarListIndexKey` | `hooks/useGlossarData`, `store/uiStore`, shared chrome components | Expo Router (`/glossar/[level]/[kapitel]`) |
+| `app/glossar/[level]/[kapitel]/flashcards.tsx` | Flip + swipe-to-navigate flashcards for one non-B2 Kapitel | `components/GlossarCard`, `hooks/useGlossarData`, `store/uiStore`, shared chrome components | Expo Router (`/glossar/[level]/[kapitel]/flashcards`) |
+| `app/glossar/b2/[kapitel]/index.tsx` | Module list for one B2 Kapitel | `hooks/useGlossarData` (`useGlossarB2Meta`), `constants/glossarKapitelTitles`, shared chrome components | Expo Router (`/glossar/b2/[kapitel]`) |
+| `app/glossar/b2/[kapitel]/[module]/index.tsx` | Word list for one B2 Module | `hooks/useGlossarData` (`useGlossarB2Meta`, `useGlossarB2Module`), `store/uiStore`, shared chrome components | Expo Router (`/glossar/b2/[kapitel]/[module]`) |
+| `app/glossar/b2/[kapitel]/[module]/flashcards.tsx` | Flip + swipe-to-navigate flashcards for one B2 Module | `components/GlossarCard`, `hooks/useGlossarData`, `store/uiStore`, shared chrome components | Expo Router (`/glossar/b2/[kapitel]/[module]/flashcards`) |
+| `app/ielts/index.tsx` | IELTS section-group picker (`IELTS_SECTION_GROUPS`) | `hooks/useIELTSData`, shared chrome components | Expo Router (`/ielts`) |
+| `app/ielts/[group]/index.tsx` | Category list within a section group; branches vocab vs. speaking per category | `hooks/useIELTSData`, `hooks/useIELTSSpeakingData`, shared chrome components | Expo Router (`/ielts/[group]`) |
+| `app/ielts/[group]/[section]/index.tsx` | Word/question list for one category; resume via `ieltsListIndexKey` | `hooks/useIELTSData`, `hooks/useIELTSSpeakingData`, `store/uiStore`, shared chrome components | Expo Router (`/ielts/[group]/[section]`) |
+| `app/ielts/[group]/[section]/flashcards.tsx` | Flip + swipe-to-navigate flashcards for vocabulary or speaking | `components/FlashCard`, `components/SpeakingCard`, `hooks/useIELTSData`, `hooks/useIELTSSpeakingData`, `store/uiStore`, shared chrome components | Expo Router (`/ielts/[group]/[section]/flashcards`) |
+| `components/AppButton.tsx` | Bordered action button (prev/next, start/continue) | `theme/ThemeContext`, `theme/typography` | All flashcards and list screens |
+| `components/ArtikelCard.tsx` | German Artikel swipe-to-answer card with directional gesture and feedback border | `hooks/useGermanData`, `theme/ThemeContext`, `theme/typography` | `app/german/[level].tsx` |
+| `components/FlashCard.tsx` | IELTS vocabulary flip card | `components/StatusBadge`, `hooks/useIELTSData`, `theme/ThemeContext`, `theme/typography` | `app/ielts/[group]/[section]/flashcards.tsx` |
+| `components/GlossarCard.tsx` | Glossar flip card | `hooks/useGlossarData`, `theme/ThemeContext`, `theme/typography` | Both Glossar flashcards screens |
+| `components/NavBar.tsx` | Back button + title + right slot | `theme/ThemeContext`, `theme/typography` | Every non-home screen |
+| `components/ProgressBar.tsx` | Generic width-filled progress bar | `theme/ThemeContext` | Not imported anywhere |
+| `components/Scales.tsx` | Decorative striped page-edge border | `theme/ThemeContext` | Every screen |
+| `components/SpeakingCard.tsx` | IELTS speaking flip card with cue-card points | `components/StatusBadge`, `hooks/useIELTSSpeakingData`, `theme/ThemeContext`, `theme/typography` | `app/ielts/[group]/[section]/flashcards.tsx` |
+| `components/StatChip.tsx` | Bordered label/value stat display | `theme/ThemeContext`, `theme/typography` | German, IELTS, and Glossar flashcards screens |
+| `components/StatusBadge.tsx` | Small bordered uppercase label chip | `theme/ThemeContext`, `theme/typography` | `components/FlashCard.tsx`, `components/SpeakingCard.tsx` |
+| `components/ThemeToggle.tsx` | Sun/moon icon toggle button | `theme/ThemeContext` | Every screen (`NavBar`'s `right` slot / home header) |
+| `components/external-link.tsx` | Starter-template external-link wrapper | - | `app/(tabs)/explore.tsx` |
+| `components/haptic-tab.tsx` | Starter-template haptic-feedback tab button | - | `app/(tabs)/_layout.tsx` |
+| `components/hello-wave.tsx` | Starter-template waving-hand animation | - | `app/(tabs)/index.tsx` |
+| `components/parallax-scroll-view.tsx` | Starter-template parallax header scroll view | `components/themed-view` | `app/(tabs)/index.tsx`, `app/(tabs)/explore.tsx` |
+| `components/themed-text.tsx` | Starter-template theme-aware `Text` | - | `app/modal.tsx`, `app/(tabs)/*`, `components/ui/collapsible.tsx` |
+| `components/themed-view.tsx` | Starter-template theme-aware `View` | - | `app/modal.tsx`, `app/(tabs)/*`, `components/ui/collapsible.tsx`, `components/parallax-scroll-view.tsx` |
+| `components/ui/collapsible.tsx` | Starter-template collapsible section | `components/themed-text`, `components/themed-view`, `components/ui/icon-symbol` | `app/(tabs)/explore.tsx` |
+| `components/ui/icon-symbol.tsx` / `.ios.tsx` | Starter-template cross-platform icon wrapper | - | `app/(tabs)/_layout.tsx`, `app/(tabs)/explore.tsx`, `components/ui/collapsible.tsx` |
+| `hooks/useGermanData.ts` | German Artikel data map/cache, shuffle helper, `useGermanData` hook | - | `app/german/index.tsx`, `app/german/[level].tsx`, `components/ArtikelCard.tsx` |
+| `hooks/useGlossarData.ts` | Glossar data maps/caches (non-B2, B2 meta, B2 Module) and hooks; `isB2Level`, level labels | - | All Glossar screens, `components/GlossarCard.tsx` |
+| `hooks/useIELTSData.ts` | IELTS vocabulary data map/cache, `IELTS_SECTION_GROUPS`, `getSectionGroupId`, `useIELTSData` hook | - | All IELTS screens, `app/index.tsx`, `components/FlashCard.tsx` |
+| `hooks/useIELTSSpeakingData.ts` | IELTS speaking-topic data map/cache, `isIELTSSpeakingSection`, `useIELTSSpeakingData` hook | - | `app/ielts/[group]/index.tsx`, `app/ielts/[group]/[section]/*`, `components/SpeakingCard.tsx` |
+| `hooks/useProgress.ts` | German-only correct/incorrect score tracking, backed by AsyncStorage | `store/progressStore` | `app/german/index.tsx`, `app/german/[level].tsx` |
+| `hooks/use-color-scheme.ts` / `.web.ts` | Starter-template OS color-scheme hook | - | `app/(tabs)/_layout.tsx` |
+| `hooks/use-theme-color.ts` | Starter-template theme-color lookup helper | `constants/theme` | Not imported by any current screen |
+| `store/progressStore.ts` | `GermanWordScore`/`GermanProgressMap` types, `STORAGE_KEYS.GERMAN_PROGRESS` | - | `hooks/useProgress.ts` |
+| `store/uiStore.ts` | `UI_STORAGE_KEYS`, `ieltsListIndexKey`, `glossarListIndexKey` | - | `app/index.tsx` and every list/flashcards screen |
+| `theme/ThemeContext.tsx` | `ThemeProvider`/`useTheme`, light/dark `ThemeColors`, AsyncStorage-backed mode persistence | - | Every screen and app-specific component |
+| `theme/typography.ts` | `FONTS`, `FONT_SIZES` tokens | - | Every screen and app-specific component |
+| `constants/theme.ts` | Starter-template `Colors`/`Fonts` tokens | - | `app/(tabs)/*` only |
+| `constants/glossarKapitelTitles.ts` | Per-level, per-Kapitel display-title lookup table, `getGlossarKapitelTitle` | - | `app/glossar/[level]/index.tsx`, `app/glossar/b2/[kapitel]/index.tsx` |

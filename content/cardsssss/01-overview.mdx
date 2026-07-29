@@ -1,0 +1,49 @@
+---
+title: Overview
+order: 1
+---
+
+Cards (repo/package name `cardsssss`) is an Expo Router mobile app for reviewing vocabulary in short swipeable or flippable card sessions. It ships three independent modules that share one card UI pattern:
+
+- **IELTS Vocabulary** - flip cards grouped by section and category (including a dedicated Speaking sub-module with cue-card questions and example answers)
+- **Deutsch Artikel** - swipe cards left/right/down to guess `der`/`die`/`das` for a German noun, with score and streak tracking
+- **Deutsch Glossar** - flip cards grouped by course level and Kapitel, with B2 splitting each Kapitel into four Module
+
+## Stack
+
+- **Expo SDK ~54** with **Expo Router ~6** (file-based routing, typed routes enabled)
+- **React 19** / **React Native 0.81**
+- **TypeScript** (`strict: true`)
+- **react-native-reanimated** and **react-native-gesture-handler** for the flip/swipe animations
+- **@react-native-async-storage/async-storage** for all persistence (progress, theme, resume position) - there is no backend or database
+- **@expo-google-fonts/jetbrains-mono** for the app's monospace font, loaded at runtime via `expo-font`'s `useFonts` hook (not self-hosted files, not `next/font`-style build-time embedding)
+- **@expo/vector-icons** (Ionicons) for icon glyphs
+
+> ⚠️ Unclear: the project was bootstrapped from the standard `create-expo-app` template. `app/(tabs)/`, `app/modal.tsx`, and their supporting components (`hello-wave.tsx`, `parallax-scroll-view.tsx`, `themed-text.tsx`, `themed-view.tsx`, `external-link.tsx`, `haptic-tab.tsx`, `ui/collapsible.tsx`) are template boilerplate. Nothing in the app's real navigation flow (`app/index.tsx` and its children) links to `/(tabs)` or `/modal`, so this appears to be unremoved starter code rather than an active part of the product. See `02-navigation-and-routing.mdx` for the routing implications.
+
+## Running locally
+
+```bash
+npm install
+npm run start      # expo start - opens Metro bundler, scan QR with Expo Go or press i/a/w
+npm run ios        # expo run:ios
+npm run android     # expo run:android
+npm run web         # expo start --web
+npm run lint         # expo lint
+```
+
+No environment variables or network access are required to run the app - all vocabulary data ships as bundled JSON in `assets/data/`.
+
+## Top-level folder structure
+
+| Folder | Purpose |
+| --- | --- |
+| `app/` | Expo Router file-based routes - screens and route groups |
+| `assets/data/` | Bundled JSON vocabulary/glossary/speaking-question data, one file per level/Kapitel/section |
+| `assets/images/`, `assets/*.png`, `assets/*.xml` | App icons, splash images, and starter-template art |
+| `components/` | Reusable UI - both app-specific cards/chrome and leftover starter-template components |
+| `constants/` | Static lookup tables: `theme.ts` (starter-template color tokens) and `glossarKapitelTitles.ts` (Kapitel display names) |
+| `hooks/` | Data-loading hooks per module (`useGermanData`, `useGlossarData`, `useIELTSData`, `useIELTSSpeakingData`) plus `useProgress` |
+| `store/` | AsyncStorage key definitions and key-builder helpers (`progressStore.ts`, `uiStore.ts`) - not a state-management library, just typed key constants |
+| `theme/` | `ThemeContext.tsx` (light/dark color provider) and `typography.ts` (font family/size tokens) |
+| `scripts/reset-project.js` | Starter-template helper that moves `app/` to `app-example/` for a clean slate; not used by the product itself |

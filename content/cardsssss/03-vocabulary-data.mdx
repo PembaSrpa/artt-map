@@ -1,0 +1,68 @@
+---
+title: Vocabulary Data Layer
+order: 3
+---
+
+All content is static JSON bundled inside the app under `assets/data/`. There is no server, database, or fetch call anywhere in the data layer - every module follows the same pattern: a hand-written map of `require()` loaders, an in-memory cache object, and a thin hook that exposes loading state to the screen.
+
+## File-naming convention
+
+| Module | File pattern | Example |
+| --- | --- | --- |
+| Deutsch Artikel | `german_<LEVEL>.json` | `german_A1.json` |
+| Deutsch Glossar (A1/A1_OLD/A2/B1) | `glossar_<LEVEL>_K<N>.json` | `glossar_A2_K7.json` |
+| Deutsch Glossar (B2 Kapitel meta) | `glossar_B2_K<N>_meta.json` | `glossar_B2_K3_meta.json` |
+| Deutsch Glossar (B2 Module words) | `glossar_B2_K<N>_M<M>.json` | `glossar_B2_K3_M2.json` |
+| IELTS vocabulary | `ielts_<GROUP><LETTER>.json` | `ielts_2C.json` |
+| IELTS speaking | `ielts_speaking_<CODE>.json` | `ielts_speaking_5AJ.json` |
+
+## Per-module shapes
+
+**German Artikel** (`hooks/useGermanData.ts`) - each file is a `GermanLevelData`:
+
+```json
+{ "level": "A1", "words": [{ "id": "A1_001", "word": "Abfahrt", "artikel": "die", "meaning": "departure" }] }
+```
+
+`artikel` is one of `der`/`die`/`das` (`GermanArtikel`). `AVAILABLE_GERMAN_LEVELS` is derived from `Object.keys(GERMAN_DATA_MAP)`, so adding a new level means adding both a JSON file and a `GERMAN_DATA_MAP` entry.
+
+**Glossar (non-B2)** (`hooks/useGlossarData.ts`) - each file is a `GlossarKapitelData`:
+
+```json
+{ "level": "A1", "kapitel": 1, "words": [{ "id": "A1_K1_002", "word": "Deutsch", "meaning": "German", "example": "Ich spreche Deutsch." }] }
+```
+
+`plural` and `example` are optional per word - `GlossarCard` (see `06-card-components-and-gestures.mdx`) only renders them when present.
+
+**Glossar (B2)** is two-tier: a `glossar_B2_K<N>_meta.json` lists the Module IDs/titles for a Kapitel:
+
+```json
+{ "level": "B2", "kapitel": 1, "modules": [{ "id": "m1", "title": "Wortschatz" }, { "id": "m2", "title": "Grammatik" }] }
+```
+
+and a `glossar_B2_K<N>_M<M>.json` per Module holds the actual `GlossarWord[]` in the same shape as non-B2 files.
+
+**IELTS vocabulary** (`hooks/useIELTSData.ts`) - each file is an `IELTSSectionData` with richer per-word fields (`type`, `category`, `example`, `synonyms[]`, `antonyms[]`) than the German modules.
+
+**IELTS speaking** (`hooks/useIELTSSpeakingData.ts`) - each file is an `IELTSSpeakingTopicData` of `IELTSSpeakingQuestion[]`. `part` is `1`, `2`, or `3`; only Part 2 ("cue card") questions carry a `cueCardPoints` string array, which `SpeakingCard` renders as a bulleted "You should say:" list.
+
+## Loader / cache pattern
+
+Every hook file repeats the same structure:
+
+1. A `..._MAP` object of `key: () => require("../assets/data/<file>.json")` entries - one entry per level, Kapitel, section, or Module.
+2. A private `Cache` object keyed the same way, populated lazily the first time a key is requested.
+3. A plain function (`getGermanLevelWords`, `getGlossarKapitelWords`, `getGlossarB2Meta`, `getGlossarB2ModuleWords`) that checks the cache, calls the loader if missing, and returns the parsed data (or an empty array/`null` if the key doesn't exist in the map).
+4. A `use...` hook that wraps the plain function in a `useEffect`/`useState` pair to expose `isLoading` to the screen, re-running whenever its key params change.
+
+Requesting an unknown key (e.g. a `level` string that isn't in the map) resolves to `undefined` from the map lookup, so the loader function returns `[]` or `null` rather than throwing - this is what backs the "no words found" / "no cards found" empty states described in `02-navigation-and-routing.mdx`.
+
+## Shuffling
+
+`getGermanLevelWords` results are shuffled with a local Fisher-Yates `shuffle` helper (exported as `shuffleGermanWords`) both on first load and on "Play again" in `app/german/[level].tsx`. Glossar and IELTS words are **not** shuffled - they're presented in file order, matching the source coursebook/list sequence.
+
+## Unused flat-word helpers
+
+`getAllGlossarWordsFlat` (in `useGlossarData.ts`) and `getAllIELTSWordsFlat` (in `useIELTSData.ts`) each eagerly load and concatenate every file in their module into one flat array, with the result memoized in a module-level variable. Neither function is imported anywhere else in the codebase.
+
+> ⚠️ Unclear: these look like leftover or in-progress code for a future "review everything" or search feature - no screen currently calls them.

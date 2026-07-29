@@ -1,0 +1,60 @@
+---
+title: Card Components & Gestures
+order: 6
+---
+
+All interactive behavior is built on `react-native-gesture-handler` (for recognizing taps/pans) and `react-native-reanimated` (for driving the resulting animations on the UI thread). None of this is `motion`/`framer-motion` - that library isn't a dependency of this project.
+
+## Flip cards: FlashCard, SpeakingCard, GlossarCard
+
+`components/FlashCard.tsx` (IELTS vocabulary), `components/SpeakingCard.tsx` (IELTS speaking), and `components/GlossarCard.tsx` (Glossar) all implement the same flip mechanic independently:
+
+1. A shared `rotation` value (`useSharedValue<number>(0)`) is animated to `0` or `180` with `withTiming(..., { duration: 300 })` whenever the parent's `flipped` boolean changes.
+2. Two absolutely-stacked faces (`frontStyle` / `backStyle`) each derive their own `rotateY` transform from the same `rotation` value via `interpolate` (front: `0→180`, back: `180→360`) plus `Extrapolation.CLAMP`, and fade out past the 90° midpoint (`opacity: rotation.value < 90 ? 1 : 0`) so the reversed back face isn't visible mirror-flipped mid-flip.
+3. `backfaceVisibility: "hidden"` on both faces hides whichever one is currently facing away from the viewer.
+
+`GlossarCard` triggers the flip from a plain `Pressable onPress`. `FlashCard` and `SpeakingCard` instead use a `Gesture.Tap()` (via `GestureDetector`) whose `onEnd` callback calls the passed-in `onPress` through `runOnJS` - functionally equivalent to a `Pressable` tap, but going through the gesture-handler system because these two cards also nest an internal `ScrollView` (their back face can contain long text - definitions, synonyms/antonyms, or a full example answer) and gesture-handler's tap recognizer coexists with a nested scrollable more predictably than a plain `Pressable` would.
+
+`FlashCard` and `SpeakingCard` both show a `StatusBadge` (small bordered, uppercased label chip) on their back face - word type for IELTS vocabulary, "PART `N`" / "PART 2 - CUE CARD" / "EXAMPLE ANSWER" for speaking.
+
+## Swipe-to-navigate (Glossar & IELTS flashcards screens)
+
+`app/glossar/[level]/[kapitel]/flashcards.tsx`, its B2 counterpart, and `app/ielts/[group]/[section]/flashcards.tsx` each wrap their card in a `GestureDetector` with a `Gesture.Pan()`:
+
+```ts
+const swipeGesture = Gesture.Pan()
+  .activeOffsetX([-15, 15])
+  .failOffsetY([-25, 25])
+  .onUpdate((event) => { translateX.value = event.translationX; })
+  .onEnd((event) => {
+    translateX.value = withSpring(0);
+    if (event.translationX < -SWIPE_THRESHOLD) runOnJS(goNext)();
+    else if (event.translationX > SWIPE_THRESHOLD) runOnJS(goPrev)();
+  });
+```
+
+`activeOffsetX`/`failOffsetY` bias the gesture toward horizontal drags so it doesn't fight the card's internal vertical `ScrollView`. `SWIPE_THRESHOLD` is `60`. The card itself only translates horizontally while dragging (`swipeCardStyle`) and always springs back to `0` on release - unlike the German Artikel card below, a Glossar/IELTS swipe never carries the card off-screen; it's purely a next/prev trigger layered on top of the same prev/next buttons (`AppButton`) shown below the card.
+
+## German Artikel swipe-to-answer: ArtikelCard
+
+`components/ArtikelCard.tsx` is the one component using the swipe gesture as the actual game input rather than as page navigation:
+
+- A `Gesture.Pan()` tracks both `translateX` and `translateY`.
+- On release, it compares `absX` vs `absY` against `SWIPE_THRESHOLD` (`100`): a dominant horizontal swipe maps to `das` (right) or `der` (left); a dominant downward swipe maps to `die`.
+- The winning gesture animates the card fully off-screen with `withTiming` (horizontal swipes travel `±screenWidth`; the downward swipe travels a fixed `600`), then calls `onSwipe(artikel)` via `runOnJS`, which is `handleSwipe` in `app/german/[level].tsx`.
+- A colored `feedbackBorder` overlay (green `#22c55e` for correct, red `#ef4444` for incorrect) is flashed via `borderOpacity` (`withTiming` back to `0` over 600ms) whenever `feedbackState` changes from `"idle"`.
+- Static direction hints (`← der`, `↓ die`, `das →`) are color-coded per gender (`der` blue `#3b82f6`, `die` red `#ef4444`, `das` green `#22c55e`) via a `GENDER_COLORS` map, and the currently-correct hint's border is highlighted once feedback is showing.
+
+`app/german/[level].tsx` calls `recordGermanAnswer` (from `useProgress`, see `04-progress-and-resume.mdx`) inside `handleSwipe`, then waits 1100ms (letting the feedback border/labels display) before resetting `feedbackState` to `"idle"` and advancing `index`.
+
+## Shared chrome components
+
+| Component | Purpose |
+| --- | --- |
+| `NavBar` | Back button (`router.back()`) + centered title + optional `right` slot (used for `ThemeToggle`) - appears at the top of every non-home screen |
+| `AppButton` | Bordered button used for prev/next controls and "Start/Continue Flashcards"; `active` prop fills the background with the accent color |
+| `StatChip` | Small bordered stat display (`label` over `value`) - used for SCORE/STREAK/CARD counters |
+| `Scales` | Decorative striped page-edge border (see `05-theming-and-typography.mdx`) |
+| `ThemeToggle` | Sun/moon icon button that calls `toggleTheme()` |
+
+`components/ProgressBar.tsx` (a generic width-filled bar) is defined but not imported anywhere in the app.

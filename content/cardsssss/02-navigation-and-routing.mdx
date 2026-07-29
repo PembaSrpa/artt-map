@@ -1,0 +1,57 @@
+---
+title: Navigation & Routing
+order: 2
+---
+
+The app uses Expo Router's file-based routing. Every screen is a file under `app/`, and the folder path becomes the URL path. There is a single root `Stack` navigator (no tab bar in the shipped product - see the note below).
+
+## Root layout
+
+`app/_layout.tsx` wraps the whole app in `GestureHandlerRootView` (required by `react-native-gesture-handler`) and a custom `ThemeProvider` (see `04-theming-and-typography.mdx`), then renders a `Stack` with `headerShown: false` and `animation: "slide_from_right"`. It also loads the JetBrains Mono font family via `useFonts` and keeps the splash screen visible (`SplashScreen.preventAutoHideAsync`) until fonts finish loading (see `05-theming-and-typography.mdx`).
+
+## Route tree
+
+```text
+app/
+├── index.tsx                          →  /                (home: three module cards)
+├── creators.tsx                       →  /creators         (credits + other projects)
+├── german/
+│   ├── index.tsx                      →  /german           (level picker: A1/A2/B1)
+│   └── [level].tsx                    →  /german/[level]   (swipe game for one level)
+├── glossar/
+│   ├── index.tsx                      →  /glossar          (level picker: A1/A1_OLD/A2/B1/B2)
+│   ├── [level]/
+│   │   ├── index.tsx                  →  /glossar/[level]                 (Kapitel list, non-B2)
+│   │   └── [kapitel]/
+│   │       ├── index.tsx              →  /glossar/[level]/[kapitel]           (word list)
+│   │       └── flashcards.tsx         →  /glossar/[level]/[kapitel]/flashcards
+│   └── b2/
+│       └── [kapitel]/
+│           ├── index.tsx              →  /glossar/b2/[kapitel]                 (Module list)
+│           └── [module]/
+│               ├── index.tsx          →  /glossar/b2/[kapitel]/[module]           (word list)
+│               └── flashcards.tsx     →  /glossar/b2/[kapitel]/[module]/flashcards
+└── ielts/
+    ├── index.tsx                      →  /ielts            (section-group picker)
+    └── [group]/
+        ├── index.tsx                  →  /ielts/[group]         (category list within a group)
+        └── [section]/
+            ├── index.tsx              →  /ielts/[group]/[section]           (word/question list)
+            └── flashcards.tsx         →  /ielts/[group]/[section]/flashcards
+```
+
+Every list screen (`.../index.tsx` at the leaf level) and every flashcards screen reads its identifying params with `useLocalSearchParams`, e.g. `[level]`, `[kapitel]`, `[module]`, `[group]`, `[section]`. B2 is split out into its own `b2/` sub-tree because it is the only Glossar level with a Module layer between Kapitel and words; `hooks/useGlossarData.ts`'s `isB2Level` function is what the `[level]/index.tsx` Kapitel-list screen checks to decide whether to `router.push` into `/glossar/b2/[kapitel]` or `/glossar/[level]/[kapitel]`.
+
+## Deep linking with a starting index
+
+Every flashcards route accepts an optional `?start=` query param (e.g. `/glossar/A1/3/flashcards?start=5`). List screens read the saved resume index from AsyncStorage and pass it as `start` when navigating in, and the flashcards screen seeds its `index` state from `params.start`. The home screen (`app/index.tsx`) builds these same deep links directly from saved AsyncStorage state to power its "Continue" shortcuts for each module.
+
+## Starter-template routes (not part of the product flow)
+
+`app/(tabs)/_layout.tsx` defines a bottom-tab navigator with `index` and `explore` screens, and `app/modal.tsx` defines a modal screen. Because `(tabs)` is a route group, its `index.tsx` would also resolve to the path `/` - the same path as the top-level `app/index.tsx`.
+
+> ⚠️ Unclear: with both `app/index.tsx` and `app/(tabs)/index.tsx` present, which one Expo Router resolves for `/` was not verified by running the bundler; nothing elsewhere in the app links to `/(tabs)` or `/modal`, so in practice a user tapping through the app never reaches them regardless of how the conflict resolves.
+
+## generateStaticParams / 404 behavior
+
+> ⚠️ Unclear: this is a client-rendered Expo/React Native app, not a static site generator, so there is no `generateStaticParams`-equivalent build step. For an unknown `[level]`, `[kapitel]`, `[module]`, `[group]`, or `[section]` value, the relevant hook's loader map (see `03-vocabulary-data.mdx`) simply returns `null`/an empty array via its `??` fallback, and the screen renders its existing "no words found" / "no cards found" empty state rather than a distinct 404 page. There is no custom `+not-found` screen in `app/`.

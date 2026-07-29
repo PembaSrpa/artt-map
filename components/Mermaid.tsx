@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useId } from "react";
+import type { PointerEvent as ReactPointerEvent } from "react";
 
-/** Decodes a base64 string back to UTF-8 text (atob alone mangles non-ASCII). */
 function decodeBase64Utf8(b64: string): string {
   try {
     const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
@@ -12,10 +12,14 @@ function decodeBase64Utf8(b64: string): string {
   }
 }
 
+const ZOOM_SCALE = 2.5;
+
 export function Mermaid({ chart }: { chart?: string }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const innerRef = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
+  const [zoomed, setZoomed] = useState(false);
   const id = useId().replace(/:/g, "-");
 
   const source = decodeBase64Utf8(chart ?? "").trim();
@@ -48,7 +52,6 @@ export function Mermaid({ chart }: { chart?: string }) {
           },
         });
 
-        // parse first so a syntax error doesn't leave the DOM in a half-rendered state
         await mermaid.parse(source);
         const { svg: rendered } = await mermaid.render(`mermaid-${id}`, source);
         if (!cancelled) setSvg(rendered);
@@ -64,8 +67,41 @@ export function Mermaid({ chart }: { chart?: string }) {
     };
   }, [source, id]);
 
-  // graceful fallback: show the raw diagram source, styled like a normal code
-  // block, instead of a cryptic parser error the reader can't do anything with
+  function applyOrigin(clientX: number, clientY: number) {
+    const wrap = wrapRef.current;
+    const inner = innerRef.current;
+    if (!wrap || !inner) return;
+    const rect = wrap.getBoundingClientRect();
+    const x = ((clientX - rect.left) / rect.width) * 100;
+    const y = ((clientY - rect.top) / rect.height) * 100;
+    const cx = Math.min(100, Math.max(0, x));
+    const cy = Math.min(100, Math.max(0, y));
+    inner.style.transformOrigin = `${cx}% ${cy}%`;
+  }
+
+  function handlePointerMove(e: ReactPointerEvent<HTMLDivElement>) {
+    if (e.pointerType === "mouse") {
+      applyOrigin(e.clientX, e.clientY);
+      setZoomed(true);
+    } else if (e.pointerType === "touch" && e.buttons > 0) {
+      applyOrigin(e.clientX, e.clientY);
+      setZoomed(true);
+    }
+  }
+
+  function handlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
+    if (e.pointerType === "touch") {
+      applyOrigin(e.clientX, e.clientY);
+      setZoomed(true);
+    }
+  }
+
+  function release() {
+    setZoomed(false);
+    const inner = innerRef.current;
+    if (inner) inner.style.transformOrigin = "50% 50%";
+  }
+
   if (failed) {
     return (
       <div className="bg-n-700/30 border border-n-700 rounded-lg overflow-hidden my-6">
@@ -88,10 +124,33 @@ export function Mermaid({ chart }: { chart?: string }) {
   }
 
   return (
-    <div
-      ref={ref}
-      className="bg-n-700/30 border border-n-700 rounded-lg p-5 my-6 overflow-x-auto [&_svg]:mx-auto"
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+    <div className="my-6">
+      <div
+        ref={wrapRef}
+        className="relative bg-n-700/30 border border-n-700 rounded-lg p-5 overflow-hidden cursor-zoom-in select-none"
+        style={{ touchAction: "none" }}
+        onPointerMove={handlePointerMove}
+        onPointerDown={handlePointerDown}
+        onPointerUp={release}
+        onPointerCancel={release}
+        onPointerLeave={release}
+      >
+        <div
+          ref={innerRef}
+          className="[&_svg]:mx-auto [&_svg]:block [&_svg]:w-full [&_svg]:h-auto"
+          style={{
+            transform: zoomed ? `scale(${ZOOM_SCALE})` : "scale(1)",
+            transformOrigin: "50% 50%",
+            transition: zoomed
+              ? "transform 0.15s ease-out"
+              : "transform 0.25s ease-out, transform-origin 0.25s ease-out",
+          }}
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      </div>
+      <div className="mt-1.5 text-center text-[11px] font-mono text-n-300/40">
+        hover to zoom &middot; on touch, hold and drag to zoom, release to reset
+      </div>
+    </div>
   );
 }

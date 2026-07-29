@@ -1,0 +1,33 @@
+---
+title: Theming & Typography
+order: 5
+---
+
+## Color system
+
+`theme/ThemeContext.tsx` defines two flat `ThemeColors` palettes - `LIGHT` and `DARK` - each with six roles: `background`, `backgroundAlt`, `text`, `textMuted`, `border`, `accent`. Every screen and component reads these off `useTheme()` and applies them inline (e.g. `{ color: colors.text }`) rather than through a Tailwind-style utility system or StyleSheet-baked theme - `StyleSheet.create` is used only for the theme-independent parts of a style (padding, layout, font family/size), and color values are always merged in separately at render time.
+
+`ThemeProvider`:
+
+1. Seeds initial `mode` from the OS via React Native's `useColorScheme()`.
+2. On mount, checks AsyncStorage key `cards_theme_mode` and overrides `mode` if a stored preference (`"light"` or `"dark"`) exists.
+3. Exposes `toggleTheme()`, which flips `mode` and persists the new value.
+
+`components/ThemeToggle.tsx` is the sun/moon icon button (Ionicons `sunny-outline` / `moon-outline`) rendered in the top-right corner (`right={<ThemeToggle />}`) of every screen's `NavBar`.
+
+> ⚠️ Unclear: `constants/theme.ts` (`Colors.light` / `Colors.dark`, `Fonts`) is a second, separate color/font system left over from the Expo starter template. It's only consumed by the unused `app/(tabs)/` and `app/modal.tsx` screens described in `02-navigation-and-routing.mdx`, not by the real app screens, which exclusively use `theme/ThemeContext.tsx`.
+
+## Fonts
+
+`theme/typography.ts` exports two token objects:
+
+- `FONTS` - `regular` / `medium` / `bold`, mapped to the string family names `JetBrainsMono_400Regular`, `JetBrainsMono_500Medium`, `JetBrainsMono_700Bold`.
+- `FONT_SIZES` - a `xs`→`xxl` numeric scale (11 to 36).
+
+The font is loaded from the `@expo-google-fonts/jetbrains-mono` package (not self-hosted files) via Expo's `useFonts` hook, called once in `app/_layout.tsx`. This is a network-free, build-time-bundled font package - `expo-font` ships the `.ttf` assets inside the package itself, so no network access is needed at runtime or build time. The splash screen (`expo-splash-screen`) stays visible until `fontsLoaded || fontError` is true, then hides.
+
+## Layout notes
+
+- There is no responsive breakpoint system - screens use `maxWidth: 420` (or `200` for the stat-chip row) plus `alignSelf: "center"` on their central content to keep cards a fixed comfortable width on larger screens/tablets, rather than switching layouts by breakpoint.
+- `components/Scales.tsx` is a purely decorative component: it renders a diagonal-hairline-striped border along the screen's left/right (and optionally bottom) edges, sized by a `variant` prop (`"compact"`, `"spacious"`, or `"large"`). It's rendered behind the content on nearly every screen as a page-edge motif and carries no interactive behavior.
+- There is no mobile-vs-desktop split in the layout logic - the app targets phones (and, incidentally, web/tablet via the same fixed-max-width components) uniformly.
