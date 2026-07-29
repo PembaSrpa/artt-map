@@ -20,7 +20,7 @@ order: 6
 
 ```mermaid
 flowchart TB
-    RC["ReaderClient / ParallelReaderClient / GradedReaderClient"] -->|"novelType='md'|'parallel'|'graded'"| TP["TutorialProvider"]
+    RC["ReaderClient / ParallelReaderClient / GradedReaderClient"] -->|"novelType='md' / 'parallel' / 'graded'"| TP["TutorialProvider"]
     TP -->|"auto-show once per type"| LS[("localStorage: tutorial-seen:<novelType>")]
     TOGGLE["TutorialToggle"] -->|"show()"| TP
     SHEET["TutorialSheet"] -->|"useTutorial() open/hide"| TP

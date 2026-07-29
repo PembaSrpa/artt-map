@@ -2,13 +2,20 @@
 
 import { useEffect, useRef, useState, useId } from "react";
 
-export function Mermaid({ chart }: { chart: string }) {
+export function Mermaid({ chart }: { chart?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
   const id = useId().replace(/:/g, "-");
 
+  const source = (chart ?? "").trim();
+
   useEffect(() => {
+    if (!source) {
+      setFailed(true);
+      return;
+    }
+
     let cancelled = false;
 
     async function render() {
@@ -17,6 +24,7 @@ export function Mermaid({ chart }: { chart: string }) {
         mermaid.initialize({
           startOnLoad: false,
           theme: "dark",
+          securityLevel: "loose",
           themeVariables: {
             background: "#262626",
             primaryColor: "#404040",
@@ -28,13 +36,15 @@ export function Mermaid({ chart }: { chart: string }) {
             fontFamily: "Fira Code, monospace",
             fontSize: "13px",
           },
-          securityLevel: "strict",
         });
 
-        const { svg: rendered } = await mermaid.render(`mermaid-${id}`, chart.trim());
+        // parse first so a syntax error doesn't leave the DOM in a half-rendered state
+        await mermaid.parse(source);
+        const { svg: rendered } = await mermaid.render(`mermaid-${id}`, source);
         if (!cancelled) setSvg(rendered);
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to render diagram");
+        console.error("Mermaid render failed:", err);
+        if (!cancelled) setFailed(true);
       }
     }
 
@@ -42,13 +52,19 @@ export function Mermaid({ chart }: { chart: string }) {
     return () => {
       cancelled = true;
     };
-  }, [chart, id]);
+  }, [source, id]);
 
-  if (error) {
+  // graceful fallback: show the raw diagram source, styled like a normal code
+  // block, instead of a cryptic parser error the reader can't do anything with
+  if (failed) {
     return (
-      <div className="bg-n-700/30 border border-n-700 rounded-lg p-4 my-6 text-[13px] text-n-300">
-        <p className="text-n-200 font-mono mb-2">Diagram failed to render</p>
-        <pre className="whitespace-pre-wrap font-mono text-[12px]">{error}</pre>
+      <div className="bg-n-700/30 border border-n-700 rounded-lg overflow-hidden my-6">
+        <div className="px-3.5 py-2 border-b border-n-700/70 font-mono text-[11px] text-n-300/60">
+          diagram source (couldn&apos;t be rendered)
+        </div>
+        <pre className="p-4 overflow-x-auto font-mono text-[12.5px] text-n-300 leading-[1.7]">
+          {source || "(empty diagram)"}
+        </pre>
       </div>
     );
   }

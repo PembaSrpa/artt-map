@@ -11,7 +11,7 @@ import { mdxComponents } from "./mdx-components";
  * syntax-highlighted HTML spans and mermaid.js can't parse it anymore.
  */
 function extractMermaidBlocks(source: string) {
-  return source.replace(/```mermaid\n([\s\S]*?)```/g, (_match, code: string) => {
+  return source.replace(/```mermaid[ \t]*\r?\n([\s\S]*?)\r?\n?```/g, (_match, code: string) => {
     const encoded = JSON.stringify(code.trim());
     return `<Mermaid chart={${encoded}} />`;
   });
