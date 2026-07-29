@@ -2,13 +2,23 @@
 
 import { useEffect, useRef, useState, useId } from "react";
 
+/** Decodes a base64 string back to UTF-8 text (atob alone mangles non-ASCII). */
+function decodeBase64Utf8(b64: string): string {
+  try {
+    const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+    return new TextDecoder().decode(bytes);
+  } catch {
+    return "";
+  }
+}
+
 export function Mermaid({ chart }: { chart?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const [svg, setSvg] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const id = useId().replace(/:/g, "-");
 
-  const source = (chart ?? "").trim();
+  const source = decodeBase64Utf8(chart ?? "").trim();
 
   useEffect(() => {
     if (!source) {
