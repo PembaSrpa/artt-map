@@ -1,7 +1,9 @@
 import type { MDXComponents } from "mdx/types";
 import { Info } from "lucide-react";
+import { Mermaid } from "./Mermaid";
 
 export const mdxComponents: MDXComponents = {
+  Mermaid,
   h1: (props) => (
     <h1 className="font-display text-[28px] sm:text-[32px] font-semibold tracking-tight mb-4" {...props} />
   ),
