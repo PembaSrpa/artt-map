@@ -9,7 +9,7 @@ import "@fontsource/fira-code/700.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "artt-map — how your apps work",
+  title: "artt-map",
   description: "Documentation for how my personal projects are built, structured, and connected.",
 };
 
