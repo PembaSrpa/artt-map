@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useId } from "react";
 import type { PointerEvent as ReactPointerEvent } from "react";
+import { DiagramFullscreen } from "./DiagramFullscreen";
 
 function decodeBase64Utf8(b64: string): string {
   try {
@@ -13,6 +14,8 @@ function decodeBase64Utf8(b64: string): string {
 }
 
 const ZOOM_SCALE = 2.5;
+const DOUBLE_TAP_MS = 300;
+const DOUBLE_TAP_MAX_DIST = 30; // px, so a drag-then-tap doesn't register as a double-tap
 
 export function Mermaid({ chart }: { chart?: string }) {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -20,7 +23,9 @@ export function Mermaid({ chart }: { chart?: string }) {
   const [svg, setSvg] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
   const [zoomed, setZoomed] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const id = useId().replace(/:/g, "-");
+  const lastTap = useRef<{ time: number; x: number; y: number } | null>(null);
 
   const source = decodeBase64Utf8(chart ?? "").trim();
 
@@ -91,9 +96,28 @@ export function Mermaid({ chart }: { chart?: string }) {
 
   function handlePointerDown(e: ReactPointerEvent<HTMLDivElement>) {
     if (e.pointerType === "touch") {
+      const now = Date.now();
+      const prev = lastTap.current;
+      if (
+        prev &&
+        now - prev.time < DOUBLE_TAP_MS &&
+        Math.hypot(e.clientX - prev.x, e.clientY - prev.y) < DOUBLE_TAP_MAX_DIST
+      ) {
+        lastTap.current = null;
+        setZoomed(false);
+        setFullscreen(true);
+        return;
+      }
+      lastTap.current = { time: now, x: e.clientX, y: e.clientY };
+
       applyOrigin(e.clientX, e.clientY);
       setZoomed(true);
     }
+  }
+
+  function handleDoubleClick() {
+    setZoomed(false);
+    setFullscreen(true);
   }
 
   function release() {
@@ -134,6 +158,7 @@ export function Mermaid({ chart }: { chart?: string }) {
         onPointerUp={release}
         onPointerCancel={release}
         onPointerLeave={release}
+        onDoubleClick={handleDoubleClick}
       >
         <div
           ref={innerRef}
@@ -149,8 +174,10 @@ export function Mermaid({ chart }: { chart?: string }) {
         />
       </div>
       <div className="mt-1.5 text-center text-[11px] font-mono text-n-300/40">
-        hover to zoom &middot; on touch, hold and drag to zoom, release to reset
+        hover to zoom &middot; on touch, hold and drag to zoom &middot; double-click/double-tap for fullscreen
       </div>
+
+      <DiagramFullscreen svg={svg} open={fullscreen} onClose={() => setFullscreen(false)} />
     </div>
   );
 }

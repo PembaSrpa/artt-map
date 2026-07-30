@@ -1,0 +1,92 @@
+---
+title: File Reference
+order: 8
+---
+
+The 15 individual `src/lib/pdf/templates/<name>/<Name>Page.tsx` files are covered as a group in `07-templates-and-layout-helpers.mdx` rather than repeated 15 times below; each one imports from `templates/shared/*` and `pdf/context.tsx`/`pdf/renderer.ts`, and is imported only by `templates/index.ts`.
+
+| File | Purpose | Imports from | Imported by |
+| --- | --- | --- | --- |
+| `src/app/layout.tsx` | Root layout - loads JetBrains Mono via `next/font/google`, sets page metadata | - | Next.js (root layout) |
+| `src/app/page.tsx` | `/` - template picker grid | `components/Scales`, `lib/store/resume`, `lib/schema/templates` | Next.js (`/`) |
+| `src/app/editor/page.tsx` | `/editor` - tabbed editor, three responsive layouts | `components/Scales`, `components/mobile/BottomNav`, `components/editor/*`, `components/ui/Button`, `components/ui/Select`, `lib/store/resume`, `lib/schema/templates` | Next.js (`/editor`) |
+| `src/app/editor/preview/page.tsx` | `/editor/preview` - PDF generation, iframe/mobile fallback, export/download | `lib/store/resume`, `components/ui/Button`, dynamic `import("@/lib/generate-pdf")` | Next.js (`/editor/preview`) |
+| `src/components/Scales.tsx` | Decorative striped page-edge border | - | `app/page.tsx`, `app/editor/page.tsx` |
+| `src/components/mobile/BottomNav.tsx` | Mobile tab bar (Basics/Sections/Design) | `components/ui/cn` | `app/editor/page.tsx` |
+| `src/components/ui/Button.tsx` | Animated button, `default`/`ghost` variants | `components/ui/cn` | Nearly every form and page |
+| `src/components/ui/Input.tsx` | Styled text input | `components/ui/cn` | Nearly every form |
+| `src/components/ui/Select.tsx` | Styled native select with custom chevron | `components/ui/cn` | `DesignPanel`, `AddCustomSectionButton`, template pickers |
+| `src/components/ui/Slider.tsx` | Styled range input with optional value readout | `components/ui/cn` | `LevelSlider`, `DesignPanel` |
+| `src/components/ui/Switch.tsx` | Animated toggle | `components/ui/cn` | `SummaryForm`, `SectionAccordion` (hidden toggles) |
+| `src/components/ui/Textarea.tsx` | Styled multiline text input | `components/ui/cn` | `SummaryForm`, `itemFields.tsx` |
+| `src/components/ui/cn.ts` | `clsx` + `tailwind-merge` class combiner | - | Every `components/ui/*` and most editor components |
+| `src/components/editor/BasicsForm.tsx` | Name/contact/photo/custom-fields form | `lib/store/resume`, `ui/Input`, `ui/Button`, `resizeImage`, `ResetTabButton` | `EditorPage` |
+| `src/components/editor/SummaryForm.tsx` | Summary title/icon/content + hidden toggle | `lib/store/resume`, `ui/Input`, `ui/Textarea`, `ui/Switch`, `itemFields` | `EditorPage` |
+| `src/components/editor/SectionAccordion.tsx` | The 12-section editor: drag-and-drop, generic/experience/custom dispatch | `@dnd-kit/*`, `motion`, `lib/store/resume`, `SectionItemModal`, `itemFields`, `InlineItemFields`, `sectionFieldConfig`, `ResetTabButton`, `DeleteSectionButton`, `AddCustomSectionButton` | `EditorPage` |
+| `src/components/editor/SectionItemModal.tsx` | `ExperienceItemModal` + nested `RoleModal` | `motion`, `ui/Input`, `ui/Textarea`, `ui/Button` | `SectionAccordion` |
+| `src/components/editor/InlineItemFields.tsx` | Renders a `FieldConfig[]` inline for one item | `itemFields` | `SectionAccordion` (`GenericItemList`) |
+| `src/components/editor/itemFields.tsx` | `FieldConfig` type, `FieldRenderer`, `emptyItemFromFields`, shared `Field` label wrapper | `ui/Input`, `ui/Textarea`, `TagInput`, `LevelSlider`, `ColorField` | `SectionAccordion`, `InlineItemFields`, `SummaryForm`, `BasicsForm` |
+| `src/components/editor/sectionFieldConfig.ts` | `GENERIC_SECTION_FIELDS` per section type, `GENERIC_TYPE_LABELS`, `sectionItemSummary` | `itemFields` (types only) | `SectionAccordion`, `AddCustomSectionButton` |
+| `src/components/editor/DesignPanel.tsx` | Colors, level style, fonts, page format/margins/gaps | `lib/store/resume`, `lib/pdf/fonts`, `ui/Select`, `ui/Slider`, `ui/Input`, `ColorField`, `ResetTabButton` | `EditorPage` |
+| `src/components/editor/ColorField.tsx` | Color swatch input backed by rgba⇄hex conversion | `colorConvert` | `DesignPanel`, `itemFields` (icon-color field) |
+| `src/components/editor/colorConvert.ts` | `rgbaToHex` / `hexToRgba` / `extractAlpha` (regex-based, UI-local) | - | `ColorField` |
+| `src/components/editor/TagInput.tsx` | Comma-delimited chip editor | `ui/Input` | `itemFields` (tags field) |
+| `src/components/editor/LevelSlider.tsx` | 0-5 proficiency slider | `ui/Slider` | `itemFields` (level field) |
+| `src/components/editor/AddCustomSectionButton.tsx` | Inline "create custom section" form (type + placement) | `lib/store/resume`, `ui/Button`, `ui/Select`, `sectionFieldConfig` | `SectionAccordion` |
+| `src/components/editor/DeleteSectionButton.tsx` | Two-click-confirm delete icon button | - | `SectionAccordion` (custom section headers) |
+| `src/components/editor/ResetTabButton.tsx` | Two-click-confirm "reset this tab" button | `ui/Button` | `BasicsForm`, `SectionAccordion`, `DesignPanel` |
+| `src/components/editor/resizeImage.ts` | Client-side photo downscale/compress to a JPEG data URL | - | `BasicsForm` |
+| `src/lib/generate-pdf.tsx` | `generatePdfBlob`, `englishSectionTitleResolver` | `@react-pdf/renderer`, `pdf/document`, `pdf/section-title` | `app/editor/preview/page.tsx` (dynamic import) |
+| `src/lib/store/resume.ts` | The Zustand `useResumeStore` (all editor state + persistence + migrations) | `zustand`, `zustand/middleware`, `uuid`, `schema/defaults` | Every editor component and page |
+| `src/lib/schema/data.ts` | The full `ResumeData` Zod schema and every derived type | `zod`, `schema/templates` | Nearly everything in `lib/` |
+| `src/lib/schema/default.ts` | The `defaultResumeData` constant | `schema/data` (types only) | `schema/defaults.ts` |
+| `src/lib/schema/defaults.ts` | `defaultResumeData()` - fresh-clone wrapper function | `schema/default`, `schema/data` (types only) | `lib/store/resume.ts` |
+| `src/lib/schema/templates.ts` | `templateSchema` (the 15-value enum), `Template` type | `zod` | Nearly everywhere a template name is used |
+| `src/lib/schema/section-icons.ts` | `defaultSectionIconNames`, `getDefaultSectionIconName` | `schema/data` (types only) | `pdf/section-icon.ts` |
+| `src/lib/schema/level-display-sizes.ts` | `resolveLevelDisplaySizes` (icon/decoration sizing math for level indicators) | - | `pdf/templates/shared/level-display.tsx` |
+| `src/lib/schema/style-rules.ts` | `getSectionStyleRuleContext`, `resolveStyleIntentForSlot`, `resolveStyleRuleFontSize` | `schema/data` (types only) | `pdf/templates/shared/context.tsx`, `pdf/templates/shared/sections.tsx` |
+| `src/lib/pdf/context.tsx` | `RenderProvider`/`useRender` - resume data + rtl + section-title resolver via context | `schema/data` (types only), `utils/locale` | `pdf/document.tsx`, every template and shared component |
+| `src/lib/pdf/document.tsx` | `ResumeDocument` - font registration + per-page template rendering | `pdf/context`, `pdf/hooks/use-register-fonts`, `pdf/renderer`, `pdf/templates` | `lib/generate-pdf.tsx` |
+| `src/lib/pdf/renderer.ts` | Re-exports `Document`/`Font`/`Image`/`Link`/`Page`/`pdf`/`renderToBuffer`/`StyleSheet`/`Text`/`View` from `@react-pdf/renderer` | `@react-pdf/renderer` | `pdf/document.tsx`, `pdf/templates/shared/primitives.tsx`, every template page |
+| `src/lib/pdf/fonts.ts` | Font catalog (`fonts-data.json`), family/weight resolution, legacy alias table | `utils/field`, `./fonts-data.json` | `pdf/hooks/use-register-fonts.ts`, `components/editor/DesignPanel.tsx` |
+| `src/lib/pdf/hooks/use-register-fonts.ts` | `registerFonts`, `resumeContentContainsCJK` | `pdf/fonts`, `utils/locale`, `pdf/renderer`, `cjk-regex` | `pdf/document.tsx` |
+| `src/lib/pdf/section-icon.ts` | `getResumeSectionIcon` - resolves a section's effective icon name | `schema/section-icons` | `pdf/templates/shared/sections.tsx` (section headings) |
+| `src/lib/pdf/section-title.ts` | `getResumeSectionTitle`, `resolveSectionTitle`, `SectionTitleResolver` type | `schema/data` (types only) | `pdf/templates/shared/sections.tsx`, `lib/generate-pdf.tsx` |
+| `src/lib/pdf/templates/index.ts` | `templatePages` map, `getTemplatePage`, `defaultTemplatePage`, re-exports every `<Name>Page` | All 15 `<Name>Page.tsx` files | `pdf/document.tsx` |
+| `src/lib/pdf/templates/shared/types.ts` | `TemplateStyleSlots`, `TemplateColorRoles`, `TemplateFeatures`, `ItemSection`/`CustomItemSection` types | `schema/data` (types only) | Every template page, `shared/context.tsx` |
+| `src/lib/pdf/templates/shared/context.tsx` | `TemplateProvider`, `useTemplateStyle`, `useSectionStyleRule`, `useTemplateIconSlot`, placement/style-rule context | `pdf/context`, `schema/style-rules` | Every template page, `shared/primitives.tsx` |
+| `src/lib/pdf/templates/shared/primitives.tsx` | `Text`, `Heading`, `Link`, `Small`, `Bold`, `Icon`, `SectionHeadingIcon`, `Div` | `shared/context`, `pdf/renderer`, `pdf/context`, `phosphor-icons-react-pdf` | Every template page and `shared/sections.tsx` |
+| `src/lib/pdf/templates/shared/sections.tsx` | Per-section-type components + the top-level `Section` dispatcher and `CustomSection` | `pdf/context`, `shared/context`, `shared/primitives`, `shared/filtering`, `schema/style-rules`, `ts-pattern` | Every template page |
+| `src/lib/pdf/templates/shared/filtering.ts` | `filterItems`, `hasVisibleItems`, `isVisibleSummary`, `isSectionVisible`, `filterSections` | `schema/data` (types only) | Every template page, `shared/sections.tsx` |
+| `src/lib/pdf/templates/shared/columns.ts` | `getSectionItemsLayout`, `getSectionItemRows`, `shouldUseSectionTimeline` | - | `shared/sections.tsx` |
+| `src/lib/pdf/templates/shared/styles.ts` | `composeStyles`, `mergeStyles`, `composeLinkStyles`, `resolvePlacementColor`, `headerNameLineHeight` | - | Nearly every template and shared file |
+| `src/lib/pdf/templates/shared/rtl.ts` | `createRtlStyleHelpers` | - | Every template page |
+| `src/lib/pdf/templates/shared/metrics.ts` | `getTemplateMetrics` | `schema/data` (types only) | Every template page |
+| `src/lib/pdf/templates/shared/page-size.ts` | `getTemplatePageSize`, `getTemplatePageMinHeightStyle` | `schema/data` (types only) | Every template page |
+| `src/lib/pdf/templates/shared/icon-size.ts` | `resolveIconSize`, `resolveStyleFontSize`, `parseStyleFontSize` | `shared/styles` | `shared/primitives.tsx` |
+| `src/lib/pdf/templates/shared/picture.ts` | `hasTemplatePicture` | `schema/data` (types only) | Every template page's `Header` |
+| `src/lib/pdf/templates/shared/contact.ts` | `getWebsiteDisplayText`, `getCustomFieldLinkUrl` | - | `shared/contact-item.tsx` |
+| `src/lib/pdf/templates/shared/contact-item.tsx` | `WebsiteContactItem`, `CustomFieldContactItem` | `shared/contact`, `shared/primitives` | Every template page's `Header` |
+| `src/lib/pdf/templates/shared/section-links.ts` | `getInlineItemWebsiteUrl`, `shouldRenderSeparateItemWebsite` | `schema/data` (types only) | `shared/sections.tsx` (`ItemTitle`, `ItemWebsiteLink`) |
+| `src/lib/pdf/templates/shared/split-row.ts` | `hasSplitRowText`, `promoteSplitRowRight` | - | `shared/sections.tsx` (item header layout) |
+| `src/lib/pdf/templates/shared/featured-summary.ts` | `getFeaturedSummaryLayout` | - | Templates that visually promote the Summary section |
+| `src/lib/pdf/templates/shared/level-display.tsx` | Renders a skill/language proficiency level per `design.level.type` | `schema/level-display-sizes`, `shared/primitives` | `shared/sections.tsx` (Skills/Languages items) |
+| `src/lib/pdf/templates/shared/safe-text-style.ts` | `safeTextStyle` - final baseline style applied to all text primitives | - | `shared/primitives.tsx` |
+| `src/lib/pdf/templates/shared/style-rules.ts` | Template-layer wrapper around `schema/style-rules`' `resolveStyleRuleSlot` | `schema/style-rules` | `shared/context.tsx` (`useSectionStyleRule`) |
+| `src/lib/pdf/templates/shared/rich-text.tsx` | Top-level rich-text (HTML) renderer component | `rich-text-html`, `rich-text-renderers`, `rich-text-stylesheet`, `react-pdf-html` | `shared/sections.tsx` (description/content fields) |
+| `src/lib/pdf/templates/shared/rich-text-html.ts` | HTML parsing helpers (via `node-html-parser`), dark-color check for auto contrast | `utils/color` | `shared/rich-text.tsx` |
+| `src/lib/pdf/templates/shared/rich-text-renderers.ts` | Per-tag React-PDF-HTML renderer overrides | `shared/primitives` | `shared/rich-text.tsx` |
+| `src/lib/pdf/templates/shared/rich-text-spacing.ts` | Paragraph/list spacing calculations for rich text | - | `shared/rich-text.tsx` |
+| `src/lib/pdf/templates/shared/rich-text-stylesheet.ts` | Base `react-pdf-html` stylesheet built from style slots | `shared/context` | `shared/rich-text.tsx` |
+| `src/lib/utils/color.ts` | `rgbaStringToHex`, `parseColorString`, `isDarkColor` | `@uiw/color-convert` | `pdf/templates/onyx/OnyxPage.tsx` (and similar), `rich-text-html.ts` |
+| `src/lib/utils/field.ts` | `unique` (used), `filterFieldValues` (unused) | - | `pdf/fonts.ts` (`unique` only) |
+| `src/lib/utils/locale.ts` | `localeSchema` (53 locales), `isLocale`, `isCJKLocale`, `isRTL` | `zod` | `pdf/context.tsx`, `pdf/hooks/use-register-fonts.ts` |
+| `src/lib/utils/string.ts` | `generateId`, `slugify`, `getInitials`, `toUsername`, `generateRandomName`, `stripHtml` | `@sindresorhus/slugify`, `unique-names-generator`, `uuid` | Not imported anywhere in this app |
+| `src/lib/utils/style.ts` | Duplicate `cn()` helper (unused - see `05-editor-ui.mdx`) | `clsx`, `tailwind-merge` | Not imported anywhere in this app |
+
+## Dependencies present but not currently wired up
+
+- **`react-hook-form`** / **`@hookform/resolvers`** - listed in `package.json`; no form in `src/components/editor/` uses `useForm` or a resolver. Every form here is plain controlled-input state patched straight into the Zustand store instead.
+- **`pdfjs-dist`** - listed in `package.json`; not imported anywhere under `src/`. The PDF preview is shown via a plain `<iframe src={blobUrl}>`, not a `pdfjs`-based custom viewer.
+
+> ⚠️ Unclear: both may be leftover from an earlier implementation approach (e.g. a form-validation layer or a custom in-app PDF viewer) that was later simplified to the current controlled-state-plus-`iframe` approach, or may be intended for near-term future use. Neither was confirmed from the code itself.

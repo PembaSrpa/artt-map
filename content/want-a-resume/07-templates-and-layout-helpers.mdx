@@ -1,0 +1,51 @@
+---
+title: Templates & Layout Helpers
+order: 7
+---
+
+## The 15 templates
+
+Every value of the `templateSchema` enum (`src/lib/schema/templates.ts`) has a matching `<Name>Page.tsx` under `src/lib/pdf/templates/<name>/` and a preview JPEG at `public/templates/jpg/<name>.jpg`:
+
+| Template | Preview shown on homepage | Default? |
+| --- | --- | --- |
+| `azurill` | `azurill.jpg` | Fallback template (`defaultTemplatePage`) if a `template` value isn't found in `templatePages` |
+| `bronzor` | `bronzor.jpg` | |
+| `chikorita` | `chikorita.jpg` | |
+| `ditgar` | `ditgar.jpg` | |
+| `ditto` | `ditto.jpg` | |
+| `gengar` | `gengar.jpg` | |
+| `glalie` | `glalie.jpg` | |
+| `kakuna` | `kakuna.jpg` | |
+| `lapras` | `lapras.jpg` | |
+| `leafish` | `leafish.jpg` | |
+| `meowth` | `meowth.jpg` | |
+| `onyx` | `onyx.jpg` | Default template written by `defaultResumeData()` |
+| `pikachu` | `pikachu.jpg` | |
+| `rhyhorn` | `rhyhorn.jpg` | |
+| `scizor` | `scizor.jpg` | |
+
+Each template file computes its own colors and `TemplateStyleSlots` (see `06-pdf-rendering-pipeline.mdx`), but all of them lean on the same shared helper layer described below rather than reimplementing layout math per template - this is what keeps 15 visually distinct designs consistent in spacing, RTL behavior, and content filtering.
+
+## Page metrics
+
+`getTemplateMetrics` (`shared/metrics.ts`) turns the four page-level numbers a person sets in the Design tab (`gapX`, `gapY`, `marginX`, `marginY`) into a fuller `TemplateMetrics` object - page padding, header gap, column gap, section gap, and item gaps - plus two scaling helper functions (`gapX(factor)`, `gapY(factor)`) so a template can derive proportional spacing (e.g. "half the item gap") without hardcoding a second set of numbers.
+
+## RTL support
+
+`createRtlStyleHelpers(rtl)` (`shared/rtl.ts`) is computed once per document (from `isRTL(metadata.page.locale)`) and handed to every template as a bundle of pre-flipped style fragments: flex row direction, text alignment, header identity alignment, contact-item separators (a border that goes on the left in RTL instead of the right, with matching padding/margin), and an `anchorToStart` helper for absolutely-positioned elements. Templates consume these instead of writing `rtl ? ... : ...` conditionals inline throughout their own layout code.
+
+## Icon sizing
+
+Icons default to inheriting the font size of whatever text they sit next to, rather than a fixed pixel size. `resolveIconSize` (`shared/icon-size.ts`) prefers an explicitly-passed `size` prop; failing that, `resolveStyleFontSize` walks backward through the composed style array (most specific/last-applied style first) looking for a numeric or `"Npx"`-formatted `fontSize` to borrow. This is why, for example, changing the body font size in the Design tab also proportionally resizes inline icons without any icon-specific size setting.
+
+## Picture and contact display helpers
+
+- `hasTemplatePicture(picture)` (`shared/picture.ts`) - a one-line check (`!picture.hidden && picture.url.trim() !== ""`) that every template's `Header` uses to decide whether to render the `<Image>` element at all.
+- `getWebsiteDisplayText(website)` / `getCustomFieldLinkUrl(field)` (`shared/contact.ts`) - resolve what text to show for a website link (the custom `label` if set, otherwise the raw URL) and whether a custom field should render as a clickable link at all (only if `link` is non-empty after trimming).
+
+## Featured summary layout
+
+`getFeaturedSummaryLayout` (`shared/featured-summary.ts`) supports templates that want to visually promote the Summary section out of the normal section list - e.g. displaying it directly under the header instead of as just another list entry. Given the list of section IDs for a placement and a `canFeatureSummary` flag (set per-template, based on whether that template's design supports the treatment), it splits out `"summary"` as `featuredSummarySection` and returns the rest as `regularSections`, or leaves everything in `regularSections` unchanged if the template doesn't support featuring it or summary isn't present in that placement at all.
+
+> ⚠️ Unclear: which specific templates set `canFeatureSummary: true` was not traced through every one of the 15 template files individually - this is a per-template design choice made inside each `<Name>Page.tsx`, not a global setting.

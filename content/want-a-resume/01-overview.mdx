@@ -1,0 +1,50 @@
+---
+title: Overview
+order: 1
+---
+
+WantAResume is a Next.js App Router app for building a resume entirely client-side: choose one of 15 templates, fill in a tabbed editor, and export a PDF. There is no account, no backend route, and no data ever leaves the browser - everything is held in a Zustand store persisted to `localStorage`.
+
+## Credit
+
+The 15 templates, the resume data schema, and the entire PDF-rendering engine (`src/lib/pdf/`) are ported from [Reactive Resume](https://github.com/AmruthPillai/Reactive-Resume) by Amruth Pillai, used under its MIT license. Nearly every file under `src/lib/pdf/` and `src/lib/schema/` opens with a comment naming the exact upstream file it was ported from, and several carry `NOTE:` comments explaining a deliberate deviation - most commonly because the original file lived in a pnpm monorepo package (`@reactive-resume/fonts`, a `#react-pdf-renderer` import-alias subpath) that this single-package project can't reproduce, so the port inlines the equivalent code directly instead.
+
+## Stack
+
+- **Next.js ~16** App Router, **React 19**, **TypeScript**
+- **Tailwind CSS v3** with a single dark neutral palette (no light mode) - see `globals.css` / `tailwind.config.js`
+- **Zustand v5** (`persist` middleware) for all editor state, backed by `localStorage`
+- **Zod v4** for the entire resume data schema (`src/lib/schema/data.ts`) and runtime validation of the template enum
+- **@react-pdf/renderer** for PDF generation - the templates render straight to PDF primitives (`Document`, `Page`, `View`, `Text`), not HTML-to-PDF
+- **react-hook-form** / **@hookform/resolvers** are dependencies but not currently wired into any form - see `08-file-reference.mdx`
+- **@dnd-kit** (`core`, `sortable`, `utilities`) for drag-and-drop reordering of sections and section items
+- **motion** (the modern package name for Framer Motion) for entrance/hover/tap animation on buttons, modals, and the homepage template grid
+- **@tabler/icons-react** for UI icons, **phosphor-icons-react-pdf** for icons rendered inside the PDF itself (two separate icon sets, because PDF rendering can't use regular React DOM icon components)
+- **JetBrains Mono** (`next/font/google`) for the editor UI; the PDF output uses its own separate font system (see `06-pdf-rendering-pipeline.mdx`)
+
+## Running locally
+
+```bash
+npm install
+npm run dev      # next dev
+npm run build    # next build
+npm run start    # next start
+```
+
+No environment variables or network access are required - the only "backend" state is `localStorage`, and template preview images are served as static files from `public/templates/jpg/`.
+
+## Top-level folder structure
+
+| Folder | Purpose |
+| --- | --- |
+| `src/app/` | The three routes: `/`, `/editor`, `/editor/preview` |
+| `src/components/editor/` | The tabbed editor's forms, accordion, modals, and small field controls |
+| `src/components/mobile/` | `BottomNav` - the mobile tab bar shown in place of the desktop tab strip |
+| `src/components/ui/` | Generic styled primitives (`Button`, `Input`, `Select`, `Slider`, `Switch`, `Textarea`) shared by every form |
+| `src/components/Scales.tsx` | Decorative striped page-edge border, shared with the Cards app documented elsewhere in this project set |
+| `src/lib/schema/` | The Zod resume data schema, its defaults, and small lookup tables (`section-icons.ts`, `style-rules.ts`, `level-display-sizes.ts`) |
+| `src/lib/store/resume.ts` | The single Zustand store holding all editor state |
+| `src/lib/pdf/` | The PDF rendering engine: document assembly, font registration, and the 15 template page components |
+| `src/lib/generate-pdf.tsx` | The one-function bridge (`generatePdfBlob`) between editor state and a downloadable PDF `Blob` |
+| `src/lib/utils/` | Small ported helpers (color parsing, locale/RTL lookup, string utilities) |
+| `public/templates/jpg/` | One preview JPEG per template, shown on the homepage template picker |
