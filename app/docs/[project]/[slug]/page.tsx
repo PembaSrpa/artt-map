@@ -40,10 +40,10 @@ export default async function DocPage({
       <TopBar />
       <MobileSidebar project={project} projects={projects} pages={pages} activeSlug={slug} />
 
-      <div className="max-w-[1400px] mx-auto flex">
+      <div className="max-w-[1680px] mx-auto flex">
         <DocsSidebar project={project} activeSlug={slug} />
 
-        <main className="flex-1 min-w-0 px-5 sm:px-10 lg:px-14 py-8 sm:py-11 pb-24 max-w-[760px]">
+        <main className="flex-1 min-w-0 px-5 sm:px-10 lg:px-14 py-8 sm:py-11 pb-24 max-w-[960px]">
           <div className="font-mono text-xs text-n-300 flex items-center gap-2 mb-3.5 uppercase flex-wrap">
             {project.label}
             <span className="text-n-300/50">/</span>
