@@ -1,5 +1,5 @@
 {
   "label": "WantAResume",
-  "description": "A browser-only Next.js resume builder: pick a template, fill a tabbed editor, and export a PDF rendered by @react-pdf/renderer from the same template code used for the live preview.",
+  "description": "A Next.js resume builder: pick a template, fill a tabbed editor, and export a PDF",
   "order": 2
 }
