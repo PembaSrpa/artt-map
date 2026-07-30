@@ -1,5 +1,5 @@
 {
-  "label": "Want A Resume ?",
-  "description": "A Next.js resume builder: pick a template, fill a tabbed editor, and export a PDF",
-  "order": 2
+  "label": "Course Management System",
+  "description": "A web application for managing courses and student enrollments.",
+  "order": 12
 }
