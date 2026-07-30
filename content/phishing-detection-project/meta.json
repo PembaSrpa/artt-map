@@ -1,0 +1,5 @@
+{
+  "label": "Phishing Detection Project",
+  "description": "Built a malicious URL detector using XGBoost achieving 94% classification accuracy.",
+  "order": 9
+}

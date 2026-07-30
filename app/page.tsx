@@ -9,7 +9,7 @@ export default function Home() {
   return (
     <div>
       <TopBar />
-      <main className="max-w-[1400px] mx-auto px-6 sm:px-10 lg:px-16 py-16 sm:py-24">
+      <main className="max-w-350 mx-auto px-6 sm:px-10 lg:px-16 py-16 sm:py-24">
         <div className="font-mono text-sm text-n-300/70 uppercase tracking-wider mb-4">
           artt-map
         </div>
@@ -17,7 +17,7 @@ export default function Home() {
           How my apps work
         </h1>
         <p className="text-n-300 text-[17px] sm:text-[19px] max-w-[62ch] mb-16 leading-relaxed">
-          Documentation for how each of my personal projects is built —
+          Documentation for how each of my personal projects is built -
           architecture, file-by-file breakdowns, and how everything connects.
         </p>
 
