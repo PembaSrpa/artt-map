@@ -28,16 +28,18 @@ export function MobileSidebar({
   }, [open]);
 
   return (
-    <div className="md:hidden">
+    <>
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="w-full flex items-center gap-2.5 px-4 sm:px-6 py-3 border-b border-n-700/60 text-n-200 text-[13.5px] sticky top-14 z-30 bg-n-800/95 backdrop-blur-sm"
+        className="md:hidden fixed top-14 left-0 right-0 z-30 h-12 flex items-center gap-2.5 px-4 sm:px-6 border-b border-n-700/60 text-n-200 text-[13.5px] bg-n-800/95 backdrop-blur-sm"
       >
         <Menu className="w-4 h-4 text-n-300" />
         <Folder className="w-3.5 h-3.5 text-n-300/70" />
         <span className="font-display font-medium">{project.label}</span>
       </button>
+      {/* reserves the space the fixed bar above would otherwise overlap */}
+      <div className="md:hidden h-12" />
 
       <AnimatePresence>
         {open && (
@@ -81,6 +83,6 @@ export function MobileSidebar({
           </div>
         )}
       </AnimatePresence>
-    </div>
+    </>
   );
 }
