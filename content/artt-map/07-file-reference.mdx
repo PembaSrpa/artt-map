@@ -1,0 +1,31 @@
+---
+title: File Reference
+order: 7
+---
+
+| File | Purpose | Imports from | Imported by |
+| --- | --- | --- | --- |
+| `app/layout.tsx` | Root layout - self-hosted font CSS imports, `<html className="dark">` | `@fontsource/inter`, `@fontsource/fira-code` | Next.js (root layout) |
+| `app/page.tsx` | `/` - project list homepage | `lib/content`, `components/TopBar` | Next.js (`/`) |
+| `app/globals.css` | Tailwind v4 CSS-native theme (`@theme inline`), the four `--n-*` color tokens, `rehype-pretty-code` base styling | - | `app/layout.tsx` |
+| `app/docs/[project]/page.tsx` | `/docs/[project]` - redirects to the first page by `order` | `lib/content` | Next.js (`/docs/[project]`) |
+| `app/docs/[project]/[slug]/page.tsx` | `/docs/[project]/[slug]` - the actual doc page, `generateStaticParams` | `lib/content`, `lib/toc`, `components/TopBar`, `components/DocsSidebar`, `components/MobileSidebar`, `components/TocRail`, `components/MdxContent` | Next.js (`/docs/[project]/[slug]`) |
+| `components/TopBar.tsx` | Sticky top bar with the `{}` wordmark, links home | `next/link` | `app/page.tsx`, `app/docs/[project]/[slug]/page.tsx` |
+| `components/DocsSidebar.tsx` | Desktop sidebar - re-derives `projects`/`pages`, wraps `SidebarNav` | `lib/content`, `components/SidebarNav` | `app/docs/[project]/[slug]/page.tsx` |
+| `components/SidebarNav.tsx` | Shared nav content (project switcher + page tree) | `components/ProjectSwitcher` | `components/DocsSidebar`, `components/MobileSidebar` |
+| `components/ProjectSwitcher.tsx` | Dropdown to jump between projects | `motion/react` | `components/SidebarNav` |
+| `components/MobileSidebar.tsx` | Mobile top bar + slide-in drawer | `motion/react`, `components/SidebarNav` | `app/docs/[project]/[slug]/page.tsx` |
+| `components/TocRail.tsx` | Scroll-synced "on this page" list | `motion/react`, `lib/toc` (types only) | `app/docs/[project]/[slug]/page.tsx` |
+| `components/MdxContent.tsx` | Mermaid-block extraction + `MDXRemote` compile call | `next-mdx-remote/rsc`, `rehype-pretty-code`, `rehype-slug`, `remark-gfm`, `components/mdx-components` | `app/docs/[project]/[slug]/page.tsx` |
+| `components/mdx-components.tsx` | Custom element overrides passed to `MDXRemote` | `components/Mermaid` | `components/MdxContent` |
+| `components/Mermaid.tsx` | Client-side diagram render, zoom, double-tap-to-fullscreen | `mermaid` (dynamic import), `components/DiagramFullscreen` | `components/mdx-components.tsx` (registered as `Mermaid`) |
+| `components/DiagramFullscreen.tsx` | Portal-rendered fullscreen diagram overlay | `react-dom` (`createPortal`), `motion/react` | `components/Mermaid.tsx` |
+| `lib/content.ts` | `getProjects`, `getProject`, `getProjectPages`, `getPageSource`, `getAllProjectSlugPairs` | `gray-matter` | Every route, `components/DocsSidebar.tsx` |
+| `lib/toc.ts` | `extractHeadings` - independent `##`-heading + slug extraction from raw MDX | - | `app/docs/[project]/[slug]/page.tsx` |
+| `lib/utils.ts` | `cn()` - `clsx` + `tailwind-merge` | `clsx`, `tailwind-merge` | Not currently imported by any file in `app/`/`components/` |
+
+## Notable observations
+
+- **`lib/utils.ts`'s `cn()` isn't used anywhere yet** - every component in this project builds its `className` strings with plain template literals/ternaries instead, unlike most of the other projects documented in `content/`, which do use an equivalent helper throughout.
+- **`DocsSidebar` re-fetches `getProjects()`/`getProjectPages()` itself** rather than receiving them as props from `app/docs/[project]/[slug]/page.tsx`, even though the page component already computed the same data one level up (to pass to `MobileSidebar`, which *does* receive them as props). Both reads are cheap local-filesystem calls, so this isn't a performance concern, but it's a small inconsistency in how the two sibling components get their data.
+- **`public/`'s five default `create-next-app` SVGs are unused** - see `01-overview.mdx`.

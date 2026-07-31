@@ -1,0 +1,42 @@
+---
+title: Overview
+order: 1
+---
+
+artt-map is the documentation site you're reading right now - a Next.js App Router app that reads a folder of Markdown/MDX files off disk and turns each project's folder into a set of docs pages with a sidebar, a scroll-synced "on this page" rail, and rendered Mermaid diagrams. This page describes artt-map's own architecture, the same way every other folder under `content/` describes one of the other projects.
+
+## Stack
+
+- **Next.js 16** App Router, **React 19**, **TypeScript**
+- **Tailwind CSS v4**, configured entirely in CSS (`app/globals.css`'s `@theme inline` block) - there is no `tailwind.config.js` file in this project
+- **`next-mdx-remote`** (the `/rsc` entry point) compiles and renders MDX content as a React Server Component - see `04-mdx-rendering.mdx`
+- **`rehype-pretty-code`** (backed by `shiki`) for syntax-highlighted code blocks, **`rehype-slug`** for heading anchor IDs, **`remark-gfm`** for GitHub-flavored Markdown (tables, etc.)
+- **`mermaid`**, dynamically imported client-side, for rendering fenced ` ```mermaid ` code blocks as diagrams
+- **`motion`** (imported from the `motion/react` entry point, not the older `framer-motion` package name) for the mobile drawer, project-switcher dropdown, and TOC-rail indicator animations
+- **`gray-matter`** for parsing each MDX file's YAML frontmatter
+- **`@fontsource/inter`** and **`@fontsource/fira-code`** - self-hosted font files imported directly as CSS in `app/layout.tsx` (`@fontsource/inter/400.css`, etc.), not `next/font/google` and not a remote Google Fonts `<link>`. Because the font files ship inside these npm packages, building this site requires no network access to fetch fonts at build or runtime.
+- **`lucide-react`** for icons, **`clsx`** + **`tailwind-merge`** (wrapped as `cn()` in `lib/utils.ts`) for conditional class composition
+
+## Running locally
+
+```bash
+npm install
+npm run dev      # next dev
+npm run build    # next build
+npm run start    # next start
+npm run lint      # eslint
+```
+
+No environment variables or external services are required - every project's documentation is a folder of local files under `content/`, and every asset (fonts, icons) is bundled rather than fetched from a CDN at runtime.
+
+## Top-level folder structure
+
+| Folder | Purpose |
+| --- | --- |
+| `app/` | The three routes (`/`, `/docs/[project]`, `/docs/[project]/[slug]`) - see `03-routing.mdx` |
+| `content/` | One folder per documented project, each a `meta.json` plus a set of `NN-slug.mdx` pages - see `02-content-system.mdx` |
+| `components/` | Sidebar/drawer/TOC/Mermaid client components plus the MDX rendering wiring - see `04-mdx-rendering.mdx` and `05-interactive-components.mdx` |
+| `lib/content.ts` | Reads `content/` off disk into typed project/page lists - see `02-content-system.mdx` |
+| `lib/toc.ts` | Extracts `##`-level headings from raw MDX for the TOC rail |
+| `lib/utils.ts` | `cn()` - the `clsx` + `tailwind-merge` class helper used throughout `components/` |
+| `public/` | `favicon.ico` plus five unused `create-next-app` starter SVGs (`next.svg`, `vercel.svg`, `globe.svg`, `file.svg`, `window.svg`) - none of them are referenced anywhere in `app/` or `components/` |

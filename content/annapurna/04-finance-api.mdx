@@ -1,0 +1,43 @@
+---
+title: Finance API & Database
+order: 4
+---
+
+There's exactly one table, `finance_entries`, and every route in `app/api/finance/` and `app/api/export/` reads or writes it through a shared, tiny connection-pool wrapper.
+
+## Schema
+
+Defined identically in two places - `lib/db.ts`'s `initDb()` (called defensively at the top of every finance-related `GET`/`POST`, so the table gets created on first use rather than requiring a separate migration step in production) and `scripts/setup-db.js` (a one-off CLI script meant to be run manually once against a fresh database):
+
+```sql
+CREATE TABLE IF NOT EXISTS finance_entries (
+  id SERIAL PRIMARY KEY,
+  date DATE NOT NULL,
+  photo NUMERIC(10,2) NOT NULL DEFAULT 0,
+  photocopy NUMERIC(10,2) NOT NULL DEFAULT 0,
+  mobile NUMERIC(10,2) NOT NULL DEFAULT 0,
+  other NUMERIC(10,2) NOT NULL DEFAULT 0,
+  expenses NUMERIC(10,2) NOT NULL DEFAULT 0,
+  notes TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+)
+```
+
+One row per day the shop owner chooses to log (there's no uniqueness constraint on `date`, so multiple entries for the same calendar day are allowed by the schema - the UI's "Add Entry" flow doesn't check for an existing entry on the selected date before inserting a new one). The four income categories (`photo`, `photocopy`, `mobile`, `other`) map directly to the shop's service lines described on the public homepage.
+
+## `lib/db.ts`
+
+A single `pg.Pool` constructed once at module load from `DATABASE_URL`, with `ssl: { rejectUnauthorized: false }` only when `NODE_ENV === 'production'` (so local Postgres connections skip SSL entirely). `query(text, params)` checks out a client from the pool, runs the query, and always releases the client back (`finally`) even if the query throws.
+
+## `GET /api/finance` and `POST /api/finance`
+
+`GET` requires auth, accepts optional `month`/`year` query params (filtering via `EXTRACT(MONTH/YEAR FROM date)` if both are present, just `year` if only that's given, or no filter at all - returning every row ever logged - if neither is passed), and always orders by `date DESC`. `POST` requires auth and inserts one row, defaulting every numeric field to `0` and `notes` to an empty string if omitted from the request body.
+
+## `PUT /api/finance/[id]` and `DELETE /api/finance/[id]`
+
+Both operate on the row matching the `id` route param. `PUT` replaces every field (not a partial patch - a request that omits a field will overwrite it with `0`/empty string, same defaulting behavior as `POST`) and returns `404` if no row matched. `DELETE` doesn't check whether the row existed first - a delete on a nonexistent `id` still returns `{ success: true }`.
+
+## `GET /api/export`
+
+Requires auth, accepts the same `month`/`year` filters as the list endpoint, but queries `SELECT *` and orders `date ASC` (oldest first, the opposite of the list view) since it's meant to read top-to-bottom as a report. Builds one plain-object row per entry (`Date` formatted `en-NP`, each category as a parsed float, plus computed `Total Income` and `Net Profit` columns), appends a final `TOTAL` row summing every numeric column, and writes it to an `.xlsx` workbook via `XLSX.utils.json_to_sheet` with fixed column widths. The response is streamed back as a `Content-Disposition: attachment` file named `annapurna-finance-<year>-<month>.xlsx` (or `-<year>.xlsx`/`-all.xlsx` depending on which filters were supplied) - the dashboard triggers this by simply navigating the browser to the URL (`window.location.href = ...`) rather than an `fetch` + blob-download dance, since the response headers alone are enough to make the browser treat it as a file download.

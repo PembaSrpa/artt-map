@@ -1,0 +1,54 @@
+---
+title: Overview
+order: 1
+---
+
+Annapurna Mobile Care (package name `annapurna-mobile-care`) is a two-purpose Next.js app for a real shop in Dharan-16, Nepal (mobile accessories, phone repair, printing, and photo/document services): a public single-page marketing site at `/`, and a password-gated admin area at `/admin` for logging each day's income by category and expenses, viewing charts, and exporting an Excel report.
+
+## Before anything else: credentials in the repo
+
+Both `.env.example` and `.env.local` in this project contain what look like **real, working-format values** rather than placeholders - a full Postgres connection string (including a password) pointing at a Supabase-hosted database, an admin login password, and a JWT signing secret. Both files are correctly listed in `.gitignore`, so they shouldn't have been pushed to the project's Git history - but since `.env.example` conventionally exists specifically to be safe to commit (and to show teammates what shape the real `.env.local` should take), having real-looking credentials in a file named "example" is worth fixing regardless of its current gitignore status: anyone who later removes `.env.example` from `.gitignore` (a very common thing to do, since example files are usually meant to be shared) would publish these values. Recommend replacing both files' contents with placeholder values (e.g. `DATABASE_URL=postgresql://user:password@host:port/dbname`) and rotating the real database password, admin password, and JWT secret if they're still in active use.
+
+This documentation does not reproduce any of those values.
+
+## What it does
+
+- **`/`** - a static marketing page: hero, services grid, about section, an embedded OpenStreetMap location, and contact links (phone/WhatsApp/email). No login needed, no data fetching.
+- **`/admin`** - a single-password login form (there's no per-user accounts, just one shared `ADMIN_PASSWORD`).
+- **`/admin/dashboard`** - once logged in: a stat-card summary, a filterable daily-entries table (add/edit/delete), a charts-based analysis view, and an Excel export button - all backed by one Postgres table, `finance_entries`.
+
+## Stack
+
+- **Next.js 14** App Router (the one project in this set of docs not on Next.js 15/16), **React 18**, **TypeScript**
+- **Tailwind CSS v3** is configured and its directives are in `globals.css`, but almost nothing in the app actually uses Tailwind utility classNames - nearly every component is styled with large inline `React.CSSProperties` objects instead (the same pattern as `WC2026`'s frontend, documented elsewhere in this project set). See `02-public-site.mdx` for what's left of an earlier, unused navy-and-gold Tailwind design system still sitting in `globals.css`/`tailwind.config.js`.
+- **`pg`** (`node-postgres`) - a plain connection pool, no ORM
+- **`jose`** for JWT signing/verification (not `jsonwebtoken`)
+- **`bcryptjs`** is a listed dependency, but the admin password is compared with a plain `!==` string check (`app/api/auth/login/route.ts`) against `process.env.ADMIN_PASSWORD` - `bcryptjs` isn't actually imported or used anywhere in the codebase, so there's no password hashing in the current login flow despite the dependency being present.
+- **`chart.js`** + **`react-chartjs-2`** for the dashboard's four analysis charts
+- **`xlsx`** (SheetJS) for the `.xlsx` export
+- **`@tabler/icons-react`** for icons on the public site and admin pages
+
+## Running locally
+
+```bash
+npm install
+node scripts/setup-db.js   # creates the finance_entries table
+npm run dev
+```
+
+Requires `DATABASE_URL`, `ADMIN_PASSWORD`, and `JWT_SECRET` to be set (via `.env.local` - see the security note above about the current contents of that file). `vercel.json` configures a standard Next.js deployment with no custom build steps, suggesting this is deployed on Vercel with a separately-hosted Postgres instance (the `.env.example` connection string points at Supabase's Postgres pooler).
+
+## Top-level structure
+
+| Path | Purpose |
+| --- | --- |
+| `app/page.tsx` | `/` - the public marketing homepage |
+| `app/admin/page.tsx` | `/admin` - password login form |
+| `app/admin/dashboard/page.tsx` | `/admin/dashboard` - the finance dashboard (780 lines - see `05-admin-dashboard.mdx`) |
+| `app/api/auth/` | Login/logout routes - see `03-auth-and-middleware.mdx` |
+| `app/api/finance/`, `app/api/export/` | Finance CRUD + Excel export routes - see `04-finance-api.mdx` |
+| `middleware.ts` | Route-level auth guard for `/admin/dashboard` |
+| `lib/db.ts` | Postgres connection pool, `query()`, `initDb()` (table creation) |
+| `lib/auth.ts` | `signToken`/`verifyToken` (JWT via `jose`) |
+| `scripts/setup-db.js` | One-off CLI script - creates the `finance_entries` table from a fresh database |
+| `public/` | `annapurna.jpg` (hero background), `shop-placeholder.svg` (about-section image) - see `02-public-site.mdx` for a missing third image |

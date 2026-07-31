@@ -1,0 +1,42 @@
+---
+title: Interactive Components
+order: 5
+---
+
+Every client component (`"use client"`) in this project uses `motion` (imported from the `motion/react` entry point) for its animation, and each is documented here with what's actually animating and why.
+
+## `MobileSidebar` - the mobile drawer
+
+Shown only below the `md` breakpoint (the desktop `DocsSidebar` is `hidden md:block`, and this component's trigger button is `md:hidden`), replacing the always-visible desktop sidebar with an on-demand slide-in drawer:
+
+- **Open/close** - a plain `open` boolean state, toggled by a fixed top bar button (showing the current project's icon and label) and an explicit close button inside the drawer.
+- **Body-scroll lock** - a `useEffect` keyed on `open` sets `document.body.style.overflow = "hidden"` while open and clears it (`""`) on close or unmount, so the page behind the drawer can't be scrolled while it's open.
+- **Exit animation** - wrapped in `AnimatePresence` so the drawer's exit transition (`x: "-100%"`, i.e. sliding back off-screen to the left) actually plays before the component unmounts, rather than disappearing instantly. The backdrop fades (`opacity` 0↔1, 0.2s) independently of the panel itself, which uses a spring transition (`stiffness: 340, damping: 34`) for a slightly bouncier slide-in feel than a plain ease curve would give.
+- Renders the same `SidebarNav` component the desktop sidebar uses (see `02-content-system.mdx`/`03-routing.mdx` for what that tree contains), passing an `onNavigate` callback that closes the drawer as soon as a link inside it is clicked.
+
+## `ProjectSwitcher` - the project dropdown
+
+Sits at the top of `SidebarNav` (so it appears both in the desktop sidebar and inside the mobile drawer), letting a reader jump to a different project's docs without going back to the homepage:
+
+- **Open/close** - toggled by clicking the current-project button; also closed by an `useEffect`-attached `document`-level `mousedown` listener that checks whether the click landed outside the component's own `ref` (a standard "click outside to close" pattern, not from any UI library).
+- The chevron icon rotates 180° via a `motion.span` driven by the same `open` boolean, using a spring transition rather than a linear one.
+- The dropdown panel itself uses `AnimatePresence` for a fade/scale/slight-upward-slide entrance and exit (`opacity`, `y: -6→0`, `scale: 0.98→1`), and lists every project from `getProjects()`, marking the current one with a checkmark.
+
+## `TocRail` - the scroll-synced "on this page" list
+
+The right-hand rail (desktop/large screens only - `hidden lg:block`) listing every `##` heading on the current page, with the currently-in-view section highlighted:
+
+- **Determining the active heading** - `updateActive` looks up every heading's DOM element by the ID computed in `lib/toc.ts`, and picks the *last* one whose top edge has scrolled above a fixed `110px` offset from the viewport top (looping through all headings and keeping overwriting `current` as it finds ones that qualify, so the last qualifying one wins) - i.e. "the heading whose section we're currently reading," not "the heading closest to the top."
+- **Edge case: reaching the bottom of the page** - if the page is scrolled essentially all the way down (`window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 4`), the *last* heading is force-highlighted regardless of its own position. This specifically covers a short final section whose own heading may never actually cross the `110px` offset threshold (e.g. a one-paragraph closing section on an otherwise long page) - without this check, the rail could get stuck highlighting the second-to-last heading even once the reader has scrolled past everything.
+- **Scroll handling** - a `scroll`/`resize` listener recomputes the active heading, throttled via `requestAnimationFrame` (a `ticking` flag prevents queuing more than one `updateActive` call per animation frame) rather than a fixed-interval debounce.
+- **The sliding indicator** - a separate `useEffect` measures the active link's position (`getBoundingClientRect`) relative to the nav container each time `activeIndex` changes, and animates a `motion.span` (a 2px vertical bar) to that `top`/`height` with a spring transition - this is what gives the rail its glide-between-headings visual rather than an instant jump.
+
+## `Mermaid` and `DiagramFullscreen` - diagram rendering, zoom, and fullscreen
+
+Covered in depth in `04-mdx-rendering.mdx` for how the diagram source reaches this component; this section covers what it does once it has that source:
+
+- **Rendering** - `mermaid` is dynamically `import()`ed client-side (kept out of the initial JS bundle since most page loads don't need it), initialized once per mount with a dark theme whose colors are hand-matched to this site's own neutral CSS variables (mirroring `app/globals.css`'s `--n-*` tokens rather than importing them, since `mermaid.initialize`'s `themeVariables` need literal color values) and `Fira Code` as the diagram font. `mermaid.parse` validates the source before `mermaid.render` produces an SVG string, and a parse/render failure falls back to showing the raw diagram source in a `<pre>` block instead of a broken diagram.
+- **Hover-to-zoom (desktop)** - on `pointerType === "mouse"`, moving over the diagram continuously updates a CSS `transform-origin` to track the cursor position (as a percentage of the diagram's bounding box) and scales the inner wrapper up by a fixed `2.5x` (`ZOOM_SCALE`), so the diagram zooms in centered on wherever the cursor currently is, similar to a magnifying-glass effect, resetting to a 1x scale on pointer-leave/up/cancel.
+- **Hold-and-drag-to-zoom (touch)** - the same zoom behavior, but gated on `e.buttons > 0` during `pointerType === "touch"` moves (i.e. only while actively pressing), since touch devices have no hover state to trigger zoom from passively.
+- **Double-tap/double-click for fullscreen** - a hand-rolled double-tap detector (`lastTap` ref tracking time and position of the previous tap) treats two touches within `300ms` and `30px` of each other as a double-tap (the distance check specifically exists so a drag-then-release-then-tap sequence, common while trying to pan/zoom, doesn't misfire as a double-tap); desktop just uses the native `onDoubleClick` event. Either path sets `fullscreen` to `true`, which mounts `DiagramFullscreen`.
+- **`DiagramFullscreen`** - renders via `createPortal` directly onto `document.body` (so it isn't affected by any ancestor's `overflow`/`transform`/`z-index` stacking context), locks body scroll and adds an `Escape`-key listener while open (both cleaned up on close), and re-renders the same already-generated SVG string at a much larger size inside a `motion.div` scale/fade transition. Clicking the backdrop, double-clicking it, pressing the close button, or pressing Escape all close it.

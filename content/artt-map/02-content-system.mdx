@@ -1,0 +1,52 @@
+---
+title: Content System
+order: 2
+---
+
+Every project's documentation is a plain folder under `content/` - there's no CMS and no database. `lib/content.ts` is the single module that turns that folder structure into typed data every route and component reads from.
+
+## A project folder
+
+```text
+content/
+└── <project-slug>/
+    ├── meta.json          # { "label": "...", "description": "...", "order": N }
+    ├── 01-overview.mdx
+    ├── 02-something.mdx
+    └── ...
+```
+
+- The **folder name** is the project's slug and becomes part of its URL (`/docs/<project-slug>/...`).
+- **`meta.json`** is optional. `getProjects()` reads it if present (`label`, `description`, `order`), and falls back to using the folder name itself as `label` and `999` as `order` if the file is missing entirely - so a project folder with no `meta.json` still shows up on the homepage, just at the end of the list with its raw folder name as the title.
+- **Every `.mdx`/`.md` file** in the folder becomes one page, ordered by an `order` frontmatter field (also defaulting to `999`, so a page missing `order` sorts last rather than causing an error).
+
+## Page filenames and slugs
+
+A page's filename convention is `NN-slug.mdx` (e.g. `03-vocabulary-data.mdx`), but the leading `NN-` prefix is purely a filesystem-listing convenience - `slugFromFilename` (`lib/content.ts`) strips it with a regex (`replace(/^\d+-/, "")`) to produce the URL slug, so `03-vocabulary-data.mdx` becomes the URL segment `vocabulary-data`, not `03-vocabulary-data`. The actual **display order** on the sidebar comes from each page's `order` frontmatter field, not from this filename prefix - the two are expected to agree (and do, throughout `content/`), but nothing enforces that they must; renumbering a page's `order` in its frontmatter without renaming the file would change its sidebar position without changing its URL.
+
+## Required frontmatter
+
+Every `.mdx` file needs, at minimum:
+
+```md
+---
+title: Page Title
+order: 2
+---
+```
+
+`title` defaults to the derived slug if omitted (so a page without a `title` still renders, just with a less readable heading), and `order` defaults to `999` as noted above. There's no schema validation beyond what `gray-matter`'s YAML parsing itself enforces - a malformed frontmatter block would throw at build/request time rather than being caught and reported with a friendlier error.
+
+## What `lib/content.ts` exposes
+
+- **`getProjects()`** - every folder under `content/`, sorted by `order`, each carrying its resolved `label`/`description`/`order`.
+- **`getProject(slug)`** - one project by slug, or `undefined` if the folder doesn't exist (or exists but wasn't picked up - `getProjects()` only lists directories, so a stray file directly under `content/` wouldn't become a project).
+- **`getProjectPages(slug)`** - every page in a project's folder, sorted by `order`. Returns `[]` if the folder doesn't exist, rather than throwing.
+- **`getPageSource(slug, pageSlug)`** - the raw MDX `content` string and parsed frontmatter `data` for one page, found by matching the derived slug (not the filename) - returns `null` if either the project or the specific page slug doesn't match anything.
+- **`getAllProjectSlugPairs()`** - every `{ project, slug }` pair across every project, used by `generateStaticParams` (see `03-routing.mdx`) to pre-render every docs page at build time.
+
+## Edge cases
+
+- **A project with zero `.mdx` pages** - `getProjects()` still lists it (as long as it's a directory under `content/`, with or without `meta.json`), but `/docs/<slug>` immediately calls `notFound()` once it sees `getProjectPages(slug).length === 0` (see `03-routing.mdx`). Several folders in this project's own `content/` directory are currently in exactly this state - present with only a `meta.json` and no pages yet (e.g. `annapurna`, `drive-time`, `expense-tracker`), which is the normal state for a project that's been added to the homepage list but not yet written up.
+- **A project folder with no `meta.json`** - still listed, using the folder name as its label, sorted last (`order: 999`) unless every other project also lacks an explicit `order`.
+- **A page with a duplicate `order` value** - `Array.prototype.sort` is not guaranteed stable across all JS engines for equal comparator results, though V8 (which Next.js runs on) does sort stably in practice; two pages sharing the same `order` would sort by their original filesystem read order rather than raising any error.

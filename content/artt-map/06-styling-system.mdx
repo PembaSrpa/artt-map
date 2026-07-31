@@ -1,0 +1,26 @@
+---
+title: Styling System
+order: 6
+---
+
+## Neutral-only color tokens
+
+`app/globals.css` defines exactly four grayscale tokens - `--n-800` (darkest, the page background), `--n-700` (borders, subtle fills), `--n-300` (muted body text), `--n-200` (lightest, headings and emphasized text) - via a `@theme inline` block, Tailwind v4's CSS-native way of registering custom theme values (`--color-n-800`, etc., become usable as `bg-n-800`, `text-n-300`, and so on directly as Tailwind utility classes, with no `tailwind.config.js` needed at all). There is **no accent color anywhere** in this palette - every other project documented in `content/` uses some accent hue (amber, red, blue), but artt-map itself is deliberately grayscale-only from background through emphasized text.
+
+`html` carries a hardcoded `className="dark"` in the root layout - there's no light-mode variant and no theme toggle; the site is permanently dark.
+
+## Fonts
+
+Two families, both self-hosted via `@fontsource` packages (imported as CSS directly in `app/layout.tsx`, not `next/font/google` and not a remote `<link>` - see `01-overview.mdx` for why that matters for build/runtime network access):
+
+- **`--font-sans` → Inter** - the body text font (`font-family: var(--font-sans)` on `body` in `globals.css`).
+- **`--font-mono` and `--font-display` → Fira Code** - both point at the same monospace family. `font-mono` is used for small uppercase labels, breadcrumbs, and code; `font-display` is used for headings and the wordmark - meaning this entire site's type system is Inter for prose and Fira Code for everything else (headings included), rather than a distinct serif/display face for headings the way some of the other documented projects use.
+
+## Layout rules
+
+- **Breakpoints** - Tailwind's default scale (`md`, `lg`) drives every responsive switch in this project; there's no custom breakpoint config.
+- **Sidebar (`DocsSidebar`)** - fixed `250px` width, `hidden md:block` (so it only appears at `md` and above), sticky-positioned below the `56px`-tall `TopBar` (`top-14`, matching `TopBar`'s `h-14`), independently scrollable (`overflow-y-auto`) from the main content column.
+- **TOC rail (`TocRail`)** - fixed `220px` width, `hidden lg:block` (a stricter breakpoint than the sidebar's `md`, so there's a range of viewport widths - `md` to `lg` - where the left sidebar is visible but the right TOC rail isn't), same sticky-below-`TopBar` treatment as the main sidebar.
+- **Main content column** - capped at `max-w-[960px]` inside a flex row alongside the two sidebars, so on very wide viewports the three-column layout doesn't stretch prose to an unreadable line length - extra space just becomes margin.
+- **Below `md`** - both the desktop sidebar and TOC rail disappear entirely, replaced by `MobileSidebar`'s fixed top bar + slide-in drawer (see `05-interactive-components.mdx`); there is no TOC-rail equivalent on mobile at all - the "on this page" list simply isn't available below `lg`.
+- **`TopBar`** - `h-14`, `sticky top-0`, present identically on every route (including the homepage), with a semi-transparent `backdrop-blur-sm` background so content scrolling underneath it is softly visible rather than hard-cut.

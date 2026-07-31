@@ -1,0 +1,27 @@
+---
+title: File Reference
+order: 6
+---
+
+| File | Purpose | Imports from | Imported by |
+| --- | --- | --- | --- |
+| `app/layout.tsx` | Root layout - metadata only | - | Next.js (root layout) |
+| `app/page.tsx` | `/` - public marketing homepage | `@tabler/icons-react`, `next/link` | Next.js (`/`) |
+| `app/globals.css` | Tailwind directives + a largely-unused navy/gold design system (see `02-public-site.mdx`) | - | `app/layout.tsx` |
+| `app/admin/page.tsx` | `/admin` - password login form | `next/navigation`, `next/link`, `@tabler/icons-react` | Next.js (`/admin`) |
+| `app/admin/dashboard/page.tsx` | `/admin/dashboard` - the full finance dashboard | `chart.js`, `react-chartjs-2`, `next/navigation` | Next.js (`/admin/dashboard`), gated by `middleware.ts` |
+| `app/api/auth/login/route.ts` | `POST` - checks `ADMIN_PASSWORD`, sets `admin_token` cookie | `lib/auth` | `app/admin/page.tsx` |
+| `app/api/auth/logout/route.ts` | `POST` - deletes `admin_token` cookie | - | `app/admin/dashboard/page.tsx` |
+| `app/api/finance/route.ts` | `GET`/`POST` on the entries collection | `lib/auth`, `lib/db` | `app/admin/dashboard/page.tsx` |
+| `app/api/finance/[id]/route.ts` | `PUT`/`DELETE` on one entry | `lib/auth`, `lib/db` | `app/admin/dashboard/page.tsx` |
+| `app/api/export/route.ts` | `GET` - streams an `.xlsx` file | `lib/auth`, `lib/db`, `xlsx` | `app/admin/dashboard/page.tsx` (via `window.location.href`) |
+| `middleware.ts` | Redirects unauthenticated `/admin/dashboard/*` requests to `/admin` | `jose` | Next.js middleware runtime |
+| `lib/auth.ts` | `signToken`, `verifyToken` | `jose` | `app/api/auth/login/route.ts`, every finance/export route's local `isAuthenticated` helper, `middleware.ts` (re-implements its own `jwtVerify` call rather than importing `verifyToken`) |
+| `lib/db.ts` | `query()`, `initDb()`, the `pg.Pool` | `pg` | Every finance/export route |
+| `scripts/setup-db.js` | Standalone CLI - creates `finance_entries` if missing | `dotenv`, `pg` | Run manually (`node scripts/setup-db.js`), not imported by the app |
+
+## Duplication worth knowing about
+
+- `isAuthenticated(req)` is copy-pasted identically into `app/api/finance/route.ts`, `app/api/finance/[id]/route.ts`, and `app/api/export/route.ts` rather than shared from `lib/auth.ts` - see `03-auth-and-middleware.mdx`.
+- The `finance_entries` `CREATE TABLE` statement is duplicated between `lib/db.ts`'s `initDb()` and `scripts/setup-db.js` - see `04-finance-api.mdx`.
+- `middleware.ts` re-implements its own `secret`/`jwtVerify` call rather than importing `verifyToken` from `lib/auth.ts`, even though both do the same thing with the same environment variable.

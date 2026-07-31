@@ -1,0 +1,30 @@
+---
+title: Public Site
+order: 2
+---
+
+`app/page.tsx` is a single client component rendering the entire homepage as one long scroll of `<section>`s, all styled with inline `React.CSSProperties` and anchor-linked from the nav (`#services`, `#about`, `#location`, `#contact`).
+
+## Sections
+
+- **Nav** - fixed header that switches from transparent to solid black on scroll (`scrolled` state from a `window.scroll` listener), with a hamburger menu on mobile (`menuOpen` state, no `useEffect`-based outside-click handling - it only closes via the X button or clicking a link).
+- **Hero** - background image (`/annapurna.jpg`), a live "Open Now"/"Closed" badge (`useIsOpen`, checked every 60s against a fixed 8:00 AM-8:00 PM window with no timezone handling beyond the visitor's local browser clock), and two CTA buttons.
+- **Services** - a hardcoded `services` array (6 categories: Mobile Accessories, Phone Repair, Printing & Photocopy, Photo Services, Document Services, Digital Services), each rendered via a shared `FadeIn` wrapper that uses `IntersectionObserver` (`useInView`) to trigger a one-time fade/slide-in animation the first time each card scrolls into view.
+- **About** - shop description text plus `/shop-placeholder.svg` and a 2×2 grid of a hardcoded `qualities` array (Fast Service, Quality First, Fair Pricing, Trusted).
+- **Location** - address/hours cards plus an embedded `<iframe>` from `openstreetmap.org/export/embed.html` with a fixed bounding box and marker coordinate (not a Google Maps embed, and not driven by any geocoding - the coordinates are hardcoded directly in the `src` URL).
+- **Contact** - two tap-to-call links (primary/alternate phone numbers), a WhatsApp deep link (`wa.me/...`), and a `mailto:` link.
+- **Footer** - repeats the shop identity plus a small "Admin Login" link to `/admin` (the only two places `/admin` is linked from anywhere in the whole app are this footer link and the nav's "Admin" button - there's no `robots.txt`/`noindex` hiding it from search engines either).
+
+## Responsiveness
+
+Rather than Tailwind responsive classNames or CSS-in-JS media queries per element, this page (and the admin login/dashboard pages) all follow the same pattern: give container elements a fixed DOM `id` (`#services-grid`, `#about-grid`, `#contact-top-grid`, etc.), then override their `grid-template-columns`/`display` with `!important` inside one `<style>{...}</style>` block at the bottom of the component, scoped by a single `@media (max-width: 768px)` query. This sidesteps CSS Modules/styled-components entirely while still getting real media-query behavior that inline `style` objects alone can't express.
+
+## Leftover unused design system
+
+`app/globals.css` and `tailwind.config.js` both define a navy-and-gold Tailwind color palette (`navy-50` through `navy-900`, `gold-300` through `gold-700`), two Google-Fonts imports (Playfair Display for a `.font-display` class, DM Sans set as the `body` font), and a set of utility classes (`.gold-text`, `.hero-bg`, `.service-card`, `.nav-link`, `.stat-card`) with hover transitions and gradient effects - none of which are used anywhere in `app/page.tsx`, `app/admin/page.tsx`, or `app/admin/dashboard/page.tsx`, all three of which use their own inline black-and-amber (`#fbbf24`) styling instead. Only `.animate-fade-in-up` and `.animate-delay-100`-`.animate-delay-400` (also defined in this file) are actually referenced, by the homepage's hero text.
+
+> ⚠️ Unclear: this strongly suggests an earlier design direction (navy/gold, serif display font, card-hover-lift utility classes) was replaced by the current darker/flatter inline-style look without cleaning up the CSS file or Tailwind config - but this wasn't confirmed by any comment or commit history, just inferred from the fact that none of it is referenced by any component.
+
+## A referenced-but-missing image
+
+`app/admin/page.tsx`'s login screen sets a background image at `/mountain-bg.svg`, but `public/` only contains `annapurna.jpg` and `shop-placeholder.svg` - there is no `mountain-bg.svg` file in the project, so the admin login page's background image will fail to load (the semi-transparent gradient overlay on top of it is still visible, so the page isn't broken, just missing that background layer).
