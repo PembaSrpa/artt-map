@@ -1,0 +1,21 @@
+---
+title: File Reference
+order: 5
+---
+
+| File | Purpose | Imports from | Imported by |
+| --- | --- | --- | --- |
+| `src/app/layout.js` | Root layout - metadata, viewport, mounts `<Analytics/>` | `./globals.css`, `@vercel/analytics/next` | Next.js (root layout) |
+| `src/app/page.js` | The only route (`/`) | `../MementoMori` | Next.js (`/`) |
+| `src/app/globals.css` | True global resets (box-sizing, background, link color) | - | `src/app/layout.js` |
+| `src/app/page.module.css` | `create-next-app` boilerplate styling | - | Not imported anywhere - dead |
+| `src/MementoMori.jsx` | Input scene, reveal scene, phase state machine, all counter math, five inline subcomponents (`DrumWheel`, `Lever`, `Digit`, `AnimDigits`, `Corner`, `BgCanvas`) | `./LifeCalendar`, `next/link` | `src/app/page.js` |
+| `src/LifeCalendar.jsx` | Weeks-grid calendar scene, `WeekPopup`, quote bank, its own `Corner`/`BgCanvas` | `framer-motion` (imported, unused - see `01-overview.mdx`), `next/link` | `src/MementoMori.jsx` (rendered when `phase === "calendar"`) |
+
+## Things worth knowing that don't fit neatly into one page
+
+- **`page.module.css` is dead** - leftover from the `create-next-app` starter, never imported.
+- **`framer-motion`'s `motion` import in `LifeCalendar.jsx` is unused** - every animation in the app is plain CSS (`@keyframes`, `transition`), not `framer-motion` components.
+- **`LIFE_EXPECTANCY_YEARS` (77) is declared independently in both files** rather than shared from one constants module - they happen to agree, but nothing enforces that they stay in sync if one is ever changed without the other.
+- **`Corner` and `BgCanvas` are duplicated verbatim** between `MementoMori.jsx` and `LifeCalendar.jsx`.
+- **The calendar's auto-scroll-to-current-week only works on the mobile layout** - see the flagged note in `04-life-calendar.mdx`.

@@ -1,0 +1,44 @@
+---
+title: Overview
+order: 1
+---
+
+Memento Mori (package name `memento-mori`) is a small, single-purpose Next.js site by the same creator (Pemba Sherpa) as the other apps documented alongside this one. It has exactly one piece of real state to manage - a birth date - and two views built from it: a live "time survived / time (statistically) remaining" counter, and a full life-in-weeks grid in the style of Tim Urban's "Your Life in Weeks."
+
+## What it does
+
+1. **Input** - the person spins three slot-machine-style drum wheels (month/day/year) to set a birth date, then pulls a mechanical lever to reveal their numbers.
+2. **Reveal** - a live, constantly-ticking counter shows how much time has elapsed since birth and how much remains before a fixed life-expectancy cutoff, switchable between seconds/minutes/hours/nights/weeks.
+3. **Calendar** - an optional deeper view: every week of a 77-year life laid out as a grid of small squares, filled in for weeks already lived, with the current week pulsing and clickable to show a day-by-day breakdown.
+
+There's no persistence anywhere - the birth date lives only in React state for the current page session and resets on reload.
+
+## Stack
+
+- **Next.js 15** App Router, **React 19** - but written in plain **JavaScript** (`.jsx`/`.js`), not TypeScript
+- **No CSS framework** - both real components are styled with large inline `React.CSSProperties` objects (a `const s = {...}` style-object-map per file) plus a `<style>{css}</style>` block injected directly in JSX for the handful of things inline styles can't do (`@keyframes`, `:hover`, `::-webkit-scrollbar`, media queries)
+- **`@vercel/analytics`** - the only third-party integration actually wired up, added in `layout.js`
+- **`framer-motion`** is a listed dependency and `LifeCalendar.jsx` imports `{ motion }` from it, but no `motion.*` component is ever used anywhere in either file - every animation in the app (drum wheel snapping, lever pull, scene transitions, the pulsing current-week square) is hand-built with plain CSS transitions/`@keyframes` instead. This import appears to be unused.
+
+## Running locally
+
+```bash
+npm install
+npm run dev      # next dev
+npm run build    # next build
+npm run start    # next start
+npm run lint      # next lint
+```
+
+No environment variables, backend, or network calls are needed - the whole app is client-side computation from a single date the person enters.
+
+## Top-level structure
+
+| Path | Purpose |
+| --- | --- |
+| `src/app/layout.js` | Root layout - page metadata, viewport config, mounts `<Analytics/>` |
+| `src/app/page.js` | The only route (`/`) - just renders `<MementoMori />` |
+| `src/app/globals.css` | A handful of true global resets (box-sizing, background, link color) |
+| `src/app/page.module.css` | Leftover `create-next-app` boilerplate styling - not imported by anything, dead |
+| `src/MementoMori.jsx` | The input scene and the reveal (counter) scene - see `02-app-flow-and-state.mdx` and `03-input-scene-components.mdx` |
+| `src/LifeCalendar.jsx` | The weeks-grid calendar scene - see `04-life-calendar.mdx` |

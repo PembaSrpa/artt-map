@@ -1,0 +1,37 @@
+---
+title: Life Calendar
+order: 4
+---
+
+`LifeCalendar.jsx` renders the "your whole life as a grid of weeks" view, reached from the reveal scene's "see your calendar" button and receiving `birthTs`/`deathTs` as props from `MementoMori`'s state - it has no state of its own for the birth date, only for the popup and quote.
+
+## The grid
+
+`weeksLived` is `Math.floor((today - birthDate) / (7 * 24 * 3600 * 1000))`; `totalWeeks` is `77 * 52` (`LIFE_EXPECTANCY_YEARS * WEEKS_PER_YEAR`, declared separately from the identical constant in `MementoMori.jsx`). The grid renders one row per year of life (77 rows), each holding 52 week-squares - every 5th row is labeled with the corresponding calendar year (`birthYear + y`) in its left margin, other rows show a transparent (invisible but layout-preserving) label so row heights stay consistent.
+
+Each square's fill state is derived purely from its index (`idx = y * 52 + w`) compared against `weeksLived`:
+- **Past** (`idx < weeksLived`) - filled solid (`#9a2a18`, a dark rust-red)
+- **Current** (`idx === weeksLived`) - outlined in bright red-orange with a `mm-pulse` glow animation looping continuously, and given a `cursor: pointer` plus a click handler
+- **Future** (`idx > weeksLived`) - empty, faint border only
+
+Only the current-week square is interactive (`handleSquareClick` no-ops for any other index) - clicking it opens `WeekPopup`.
+
+## Responsive layout: two different DOM structures, not just CSS resizing
+
+Each row is rendered **twice** in the DOM - a `.lc-row-desktop` version (all 52 weeks in a single flex row) and a `.lc-row-mobile` version (the same 52 weeks split into two 26-week rows, `rowA`/`rowB`) - with CSS media queries (`display: none`/`flex` toggled at a 500px breakpoint) deciding which one is actually visible, rather than one row whose wrapping is handled by flexbox alone. This roughly doubles the number of week-square elements rendered per page load (one full set per breakpoint), which is a reasonable trade for keeping the "2 rows of 26 on mobile" layout simple to reason about, but is worth knowing if the grid's render cost ever needs optimizing.
+
+> ⚠️ Unclear-but-observed: the auto-scroll-to-current-week effect (`currentWeekRef.current.scrollIntoView(...)` on mount) only attaches `currentWeekRef` to the current-week square inside the **mobile** row's markup - the desktop row's current-week square has no `ref` attached at all. In-code comments (`// 1. ADDED REF HERE`, `// 4. ALSO ATTACHED REF HERE FOR MOBILE VIEW`) suggest this was a deliberately added feature, but as written the auto-scroll only functions when the mobile (`<500px`) layout is the one actually rendered - on wider viewports the page loads without scrolling to the current week.
+
+## `WeekPopup`
+
+Opened for the current week only, showing that week's 7 days with German three-to-five-letter abbreviations (`DE_DAYS` - `SONN`/`MON`/`DIENS`/`MITT`/`DONN`/`FREI`/`SAMS`) despite the rest of the app's copy being in English, and dates formatted via `toLocaleDateString("de-DE", ...)`. Each day row shows one of three states: a diagonal-cross "X" mark (SVG lines) for a past day within the current week, a live-filling progress bar (`dayPct`, recomputed every second via `setInterval`, based on the current wall-clock time's fraction of a 24-hour day) for today specifically, or an empty bordered box for a future day in the current week. A live clock (`toLocaleTimeString("de-DE", ...)`) is shown at the bottom, also updating every second alongside `dayPct`.
+
+> ⚠️ Unclear: why the day labels and date/time formatting specifically use German locale conventions while all other UI text is English was not explained anywhere in the code or README - this may be an intentional stylistic/thematic choice (evoking something starker or more clinical) or simply left over from development.
+
+## Quotes
+
+`QUOTES` is a large fixed array (~200 short memento-mori-themed aphorisms, e.g. "You are not promised tomorrow," "Begin.") hardcoded directly in `LifeCalendar.jsx`. `useMemo(() => QUOTES[Math.floor(Math.random() * QUOTES.length)], [])` picks one at component mount and keeps it fixed for the lifetime of the component (won't change on re-render, only on remounting the whole calendar scene) - it's shown once, italicized, under the page header.
+
+## Shared-but-duplicated pieces
+
+`Corner` and `BgCanvas` in this file are separate, near-identical redeclarations of the same-named components in `MementoMori.jsx` (see `03-input-scene-components.mdx`) - there's no shared component file either could import from instead.

@@ -1,0 +1,33 @@
+---
+title: Input Scene Components
+order: 3
+---
+
+The input and reveal scenes share five small subcomponents, all defined inline inside `MementoMori.jsx` rather than split into their own files.
+
+## `DrumWheel` - the slot-machine date picker
+
+A `DrumWheel` renders a scrollable `<div>` of stacked values (months, valid days for the current month/year, or a 105-year range ending at the current year) inside a fixed-height viewport (`ITEM_H * 5` = 260px, showing 5 rows at once), with the middle row visually emphasized (larger font, brighter color) via a `dist = Math.abs(i - idx)` distance-from-selected calculation applied per row. It supports three independent input methods that all converge on the same `commitScroll` logic:
+
+- **Native scroll** - the browser's own `scrollTop`, with `onScroll` debounced 100ms (`snapTimer`) before snapping to the nearest row and committing that value.
+- **Mouse drag** - `startDrag`/`moveDrag`/`endDrag`, attached via `onMouseDown` on the wheel plus `window`-level `mousemove`/`mouseup` listeners (so a drag continues tracking even if the cursor leaves the wheel's bounds). A simple velocity estimate (`(lastY - clientY) / dt`) is captured on each move and applied as extra scroll distance (`velocity * 150`) on release, giving the wheel a bit of flick-scroll momentum before it settles.
+- **Touch drag** - `onTouchStart`/`onTouchMove`/`onTouchEnd`, calling the same `startDrag`/`moveDrag`/`endDrag` functions with the touch point's `clientY`.
+- **Direct click** - clicking any visible row calls `onChange` and scrolls to it directly, bypassing the drag/momentum path entirely.
+
+Two gradient overlays (top and bottom, `linear-gradient(..., var(--c-bg) 0%, transparent 100%)`) fade the wheel's edges to make it read as a continuous cylinder rather than a flat scrolling list, and a fixed center-row border highlights the "selected" slot the wheel is always centered on.
+
+## `Lever`
+
+A single mechanical-lever control: clicking it (or pressing Enter while focused, via `role="button"`/`tabIndex={0}`/`onKeyDown`) animates its handle sliding down (`top` from `14%` to `62%`, `cubic-bezier` eased) over 520ms before calling `onPull` (`handleReveal`) - the delay exists purely so the pull animation has time to play before the scene transitions away. While `disabled` (an invalid/future date is selected), the whole control dims to `opacity: 0.35` and both the click handler and keyboard handler short-circuit immediately.
+
+## `Digit` and `AnimDigits` - the ticking counter display
+
+`fmtVal(value, mode)` floors a raw numeric value and zero-pads it to a fixed width per mode (12 digits for seconds/minutes, 9 for hours, 6 for nights/weeks) so the counter's width never jumps around as the number grows. `AnimDigits` splits that padded string into groups of 3 (rendering a faint `·` separator between groups, functioning like thousands separators) and renders one `Digit` per character. Each `Digit` compares its incoming character against the previous one it rendered (via a `ref`, not state, so the comparison doesn't itself trigger a re-render) - when a digit actually changes, it briefly animates (opacity dip + a small upward scale/translate flicker, 180ms) before settling, so the whole 12-digit seconds counter doesn't just static-flash on every frame; only the digits that actually changed visibly "tick."
+
+## `Corner`
+
+Four small L-shaped corner brackets (top-left/top-right/bottom-left/bottom-right), `position: fixed` at the viewport edges, purely decorative framing with `pointerEvents: none`. This exact component (same props, same positions, near-identical styling) is duplicated in `LifeCalendar.jsx` rather than shared from one file.
+
+## `BgCanvas`
+
+A full-viewport `<canvas>` behind everything, animated via its own `requestAnimationFrame` loop (independent of `useRaf`): ten faint vertical lines are drawn each frame with a slow sinusoidal horizontal wobble (`Math.sin(y * 0.006 + t + phase) * amp`), each line's phase and amplitude randomized once on mount. `t` increments a small fixed amount per frame, and the canvas resizes to match the window on a `resize` listener. Like `Corner`, this exact component is duplicated verbatim in `LifeCalendar.jsx`.
