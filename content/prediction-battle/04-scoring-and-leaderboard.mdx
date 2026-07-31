@@ -1,0 +1,27 @@
+---
+title: Scoring & Leaderboard
+order: 4
+---
+
+## Ranked Probability Score (RPS)
+
+Both models are compared using RPS, a proper scoring rule for ordered categorical outcomes (win/draw/loss is treated as ordered: loss < draw < win) - lower is better, `0` is a perfect prediction, and a uniform `[1/3, 1/3, 1/3]` guess scores `~0.222` against a random result. `computeRPS` (`lib/data.ts`, run client-side on the leaderboard page) and `rps`/`rps_dataset` (`Pemba/src/train.py`, run during training/validation) implement the same two-category cumulative-sum formula independently in TypeScript and Python respectively - they aren't shared code, just the same well-known formula written twice.
+
+```text
+For predicted [p_win, p_draw, p_loss] and actual outcome (one-hot in the same order):
+  cum_pred_i = sum of predicted probabilities up to category i
+  cum_actual_i = sum of actual (one-hot) values up to category i
+  RPS = mean over the first 2 categories of (cum_pred_i - cum_actual_i)^2
+```
+
+## How the leaderboard computes it
+
+`/leaderboard` (`app/leaderboard/page.tsx`) only scores fixtures that are already `FINISHED`. For each one, it derives the actual `outcome` (`"win"`/`"draw"`/`"loss"`) from `goals_home` vs `goals_away`, looks up that match's `sunless` and `frank` predictions (fetched per-stage, across every stage that has at least one finished match), and calls `computeRPS` for whichever model has a prediction for that match id (a model with no prediction for a given match is simply excluded from that match's average, not scored as wrong). Two `ModelStat`s are built - name, color, cumulative RPS, count scored, RPS-per-match - sorted best-first (lowest `per_match` wins), and the leading model's summary card is given a gold `LEADING` badge. The full per-match breakdown table below the summary cards shows both models' RPS for every finished match side by side, bolding whichever model's badge (`SUNLESS`/`FRANK`) scored lower for that specific match, or `TIE` if it's a wash (including when neither model has a prediction, or when both scored identically).
+
+## What "human" leaderboard rows would need
+
+`lib/types.ts`'s `LeaderboardRow` type (`rank`, `user_id`, `username`, `is_model`, `model_color`, `cumulative_rps`, `matches_predicted`, `accuracy`) is shaped to rank human predictors and the two models on one combined table - `is_model`/`model_color` exist specifically to visually distinguish "this row is Sunless/Frank" rows from "this row is a signed-up person" rows. The `LeaderboardTable` component already renders exactly this shape (see `03-frontend-components.mdx`), and `/signup` already creates the Supabase `users` row (`id`, `username`) this would need. What's missing, and not present anywhere in this codebase, is: a way for a signed-in user to actually submit their own win/draw/loss picks per fixture, and any query that would compute `cumulative_rps`/`accuracy` for a human the same way `computeRPS` does for the two models. The current `/leaderboard` implementation is entirely models-only and doesn't read from Supabase at all.
+
+## Two independently-computed sets of predictions, one scoring rule
+
+Because `sunless` and `frank` are produced by two completely separate pipelines (different data sources, different model types, different feature sets - see `05-ml-pipeline-sunless.mdx` and `06-ml-pipeline-frank.mdx`), the leaderboard is a genuine head-to-head: both are scored against the same real-world results using the same RPS formula, with no shared training data or feature-engineering code between them that could make the comparison less independent than it looks.

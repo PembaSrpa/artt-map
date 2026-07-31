@@ -1,0 +1,36 @@
+---
+title: Frontend Components
+order: 3
+---
+
+Every component in `App/components/` is styled entirely with inline `React.CSSProperties` objects written directly at the JSX call site (no shared `styles` constant files, no CSS modules apart from the unused `page.module.css` left over from `create-next-app`) - a dense, single-purpose style per element rather than a reusable style-token system. A shared `const F = "'JetBrains Mono',monospace"` constant is redeclared at the top of nearly every file rather than imported from one place.
+
+## `Nav`
+
+A sticky top bar: the `WC2026` wordmark, a segmented tab control (Matches/Groups/Bracket/Leaderboard, each just calling `router.push`), and a `MODEL BATTLE` tagline hidden on narrow viewports (`.nav-tagline` in `globals.css`). Tab labels collapse to single letters (`M`/`G`/`B`/`L`) on mobile via CSS classes (`.tab-full`/`.tab-short`) toggled by a media query, rather than conditional rendering in JS.
+
+## `MatchCard`
+
+Renders one fixture: stage label, formatted kickoff time (`formatDate`, `lib/utils.ts`), a status pill (`LIVE`/`FT`/`TBD`/`UPCOMING`), team crests + names, and either the final score (if `FINISHED`) or a `VS` divider. Below that, two `ProbBar`s side by side - one per model - or a "no prediction" placeholder box if that model has no prediction for this match yet. If either team slot is still unresolved (`isTBD`, i.e. a knockout bracket slot that hasn't been decided by earlier results), the whole card dims to `opacity: 0.6` and shows a single "predictions available once bracket is set" message instead of the two `ProbBar`s.
+
+## `ProbBar`
+
+A single model's `p_win`/`p_draw`/`p_loss` as a segmented horizontal bar (three flex children sized by percentage width, win-colored/gray/darker-gray) plus a numeric readout row underneath. `color` (a `ModelColor`) is resolved to an actual hex value via `modelTextColor` (`lib/utils.ts`) - `"blue"` for Sunless, `"red"` for Frank, consistently across `MatchCard`, the leaderboard, and `LeaderboardTable`.
+
+## `GroupTable`
+
+Takes a group's enriched matches and computes standings **client-side, on every render** - `buildStandings` walks every match, initializes a `TeamStat` for every team seen (home or away), and only tallies `won`/`drawn`/`lost`/points/goals for `FINISHED` matches. Sort order is points, then goal difference, then goals-for - a simplified version of official tiebreaker rules (no head-to-head-among-tied-teams, no disciplinary points, no drawing of lots), which is a reasonable simplification for a prediction-visualization tool but worth knowing if group standings are ever compared against an official source. Top two rows per group are highlighted (brighter text + a small ✓) as the qualifying positions.
+
+## `BracketView`
+
+One column per knockout stage (`KNOCKOUT_STAGES`, skipping any stage with zero fixtures), each column stacking a `BracketMatch` (both team rows, winner's row highlighted if the match is `FINISHED`) or a `TBDMatch` placeholder (two literal "TBD" rows) for matches whose bracket slot isn't decided yet. The whole thing sits in a horizontally-scrollable flex row (`overflowX: auto`, `minWidth: max-content`) so it doesn't need responsive column-count logic - it just scrolls sideways on narrow screens.
+
+## `LeaderboardTable` - built, but unused
+
+`components/LeaderboardTable.tsx` renders a full ranked table from a `LeaderboardRow[]` (rank, avatar-initial, username, a `model`/`human` badge, cumulative RPS, matches predicted, an accuracy bar) - a noticeably richer display than what `/leaderboard` actually shows (which builds its own simpler two-model table inline, see `02-app-routing-and-data-flow.mdx`). Nothing in `App/` imports `LeaderboardTable`.
+
+> ⚠️ Unclear: taken together, `LeaderboardTable`'s `is_model`/`username`/`accuracy` fields (matching the `LeaderboardRow` type in `lib/types.ts`), the working-but-unlinked `/login` and `/signup` pages, and the `AppUser`/`users`-table code in `lib/supabase.ts` and `signup/page.tsx` all point toward a planned "sign up, submit your own predictions, and get ranked against Sunless and Frank on the same leaderboard" feature that was scaffolded (types, Supabase calls, the richer table component) but never connected to the rest of the app - there's no page anywhere for a signed-in user to actually submit a prediction. This is inferred from what exists in the code, not confirmed by any comment or commit message.
+
+## `Scales`
+
+The same decorative striped-edge motif documented for the Cards apps - `position: fixed` left/right bars using a `repeating-linear-gradient` background, `pointerEvents: none`, rendered once in the root layout rather than per-page.

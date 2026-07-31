@@ -1,0 +1,48 @@
+---
+title: Overview
+order: 1
+---
+
+Cardsssss Web (package name `cards-web`) is the browser counterpart to the Expo/React Native app [Cardsssss](https://github.com/PembaSrpa/Cardsssss) - same three vocabulary modules, same card-review idea, rebuilt with plain Next.js App Router and no cross-platform framework. It's made by the same creator as the `want-a-resume` app linked from its Creators page.
+
+## The three modules
+
+- **IELTS Vocabulary** - flip cards grouped by section group (1-4) and category, plus a Speaking sub-group (group `5`) of cue-card questions and example answers
+- **Deutsch Artikel** - drag/swipe cards left, right, or down to guess `der`/`die`/`das` for a German noun, with score and streak tracking
+- **Deutsch Glossar** - flip cards grouped by course level and Kapitel, with B2 splitting each Kapitel into four Module
+
+## Stack
+
+- **Next.js 16** App Router, **React 19**, **TypeScript** (`strict` implied by the project's type annotations throughout)
+- **No CSS framework** - every component styles itself with inline `React.CSSProperties` objects (a `styles` constant per file), plus a handful of `<style>` tag blocks for things inline styles can't express (media queries, `::-webkit-scrollbar`, line-clamping)
+- **No animation or gesture library** - card flips are pure CSS 3D transforms (`perspective` / `transformStyle: preserve-3d` / `rotateY`), and swipe/drag interactions are hand-rolled from the Pointer Events API (`onPointerDown`/`onPointerMove`/`onPointerUp`) rather than `react-native-gesture-handler` or a web equivalent
+- **`lucide-react`** for icons (the web equivalent of the mobile app's Ionicons)
+- **`localStorage`** for all persistence, wrapped in a small async-looking API (`lib/storage.ts`) that mirrors the shape of React Native's `AsyncStorage` so the rest of the codebase (hooks, stores) reads the same either way
+- Vocabulary/glossary data ships as **JSON files loaded via dynamic `import()`**, code-splitting each level/Kapitel/section into its own chunk rather than bundling everything up front
+
+> ⚠️ Unclear: this repository doesn't include the mobile Cardsssss app's source for direct comparison - differences noted throughout these docs (e.g. dynamic-import data loading vs. `require()`, CSS transforms vs. Reanimated, Pointer Events vs. Gesture Handler) describe what's actually in *this* codebase, not a verified diff against the mobile version.
+
+## Running locally
+
+```bash
+npm install
+npm run dev      # next dev
+npm run build    # next build
+npm run start    # next start
+npm run lint      # next lint
+```
+
+No environment variables or network access are required - all vocabulary data is bundled JSON, and the only persistence is the browser's own `localStorage`.
+
+## Top-level folder structure
+
+| Folder | Purpose |
+| --- | --- |
+| `app/` | Next.js App Router routes - one folder per module, each `"use client"` |
+| `components/` | Shared UI: cards, nav chrome, the `Pressable`/`SwipeNav` interaction primitives |
+| `data/` | Bundled JSON - one file per German level, Glossar Kapitel/Module, and IELTS section/speaking topic |
+| `hooks/` | Per-module async data loaders (`useGermanData`, `useGlossarData`, `useIELTSData`, `useIELTSSpeakingData`) plus `useProgress` |
+| `store/` | `localStorage` key name constants and key-builder functions (`progressStore.ts`, `uiStore.ts`) - not a state library, just typed key names |
+| `theme/` | `ThemeContext.tsx` (light/dark color provider) and `typography.ts` (font family/size/weight tokens) |
+| `constants/glossarKapitelTitles.ts` | Per-level, per-Kapitel display-title lookup table |
+| `lib/storage.ts` | The `localStorage` wrapper every hook and store keys off of |

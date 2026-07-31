@@ -1,5 +1,5 @@
 {
   "label": "Cardsssss Web",
-  "description": "A web version of the Cardsssss app, built with Next.js",
+  "description": "The Next.js web port of the Cardsssss mobile app.",
   "order": 6
 }

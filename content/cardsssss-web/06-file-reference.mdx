@@ -1,0 +1,48 @@
+---
+title: File Reference
+order: 6
+---
+
+Covers `app/`, `components/`, `hooks/`, `store/`, `theme/`, `constants/`, and `lib/`. Bundled JSON files under `data/` are covered by naming pattern in `03-vocabulary-data.mdx` rather than listed individually.
+
+| File | Purpose | Imports from | Imported by |
+| --- | --- | --- | --- |
+| `app/layout.tsx` | Root layout - Google Fonts `<link>` for JetBrains Mono, wraps app in `ThemeProvider` | `theme/ThemeContext` | Next.js (root layout) |
+| `app/page.tsx` | Home - three module cards + "Continue" resume shortcuts | `components/Pressable`, `components/Scales`, `components/ThemeToggle`, `hooks/useIELTSData`, `store/uiStore`, `theme/*`, `lib/storage` | Next.js (`/`) |
+| `app/creators/page.tsx` | Credits screen - links to creators' portfolios and other projects (incl. `want-a-resume`) | `components/NavBar`, `components/Pressable`, `components/Scales`, `theme/*` | Next.js (`/creators`) |
+| `app/german/page.tsx` | Deutsch Artikel level picker with per-level accuracy | `hooks/useGermanData`, `hooks/useProgress`, `store/uiStore`, shared chrome components | Next.js (`/german`) |
+| `app/german/[level]/page.tsx` | Deutsch Artikel swipe game screen, incl. "Deck complete" state | `components/ArtikelCard`, `components/StatChip`, `hooks/useGermanData`, `hooks/useProgress`, `store/uiStore`, shared chrome components | Next.js (`/german/[level]`) |
+| `app/glossar/page.tsx` | Glossar level picker (A1/A1_OLD/A2/B1/B2) | `hooks/useGlossarData`, shared chrome components | Next.js (`/glossar`) |
+| `app/glossar/[level]/page.tsx` | Kapitel list for a level; routes to `/glossar/b2/...` if `isB2Level` | `hooks/useGlossarData`, `constants/glossarKapitelTitles`, shared chrome components | Next.js (`/glossar/[level]`) |
+| `app/glossar/[level]/[kapitel]/page.tsx` | Word list for one non-B2 Kapitel; resume state via `glossarListIndexKey` | `hooks/useGlossarData`, `store/uiStore`, shared chrome components | Next.js (`/glossar/[level]/[kapitel]`) |
+| `app/glossar/[level]/[kapitel]/flashcards/page.tsx` | Flip + swipe-to-navigate flashcards for one non-B2 Kapitel, incl. "Kapitel complete" state | `components/GlossarCard`, `components/SwipeNav`, `hooks/useGlossarData`, `store/uiStore`, shared chrome components | Next.js (`/glossar/[level]/[kapitel]/flashcards`) |
+| `app/glossar/b2/[kapitel]/page.tsx` | Module list for one B2 Kapitel | `hooks/useGlossarData` (`useGlossarB2Meta`), `constants/glossarKapitelTitles`, shared chrome components | Next.js (`/glossar/b2/[kapitel]`) |
+| `app/glossar/b2/[kapitel]/[module]/page.tsx` | Word list for one B2 Module | `hooks/useGlossarData`, `store/uiStore`, shared chrome components | Next.js (`/glossar/b2/[kapitel]/[module]`) |
+| `app/glossar/b2/[kapitel]/[module]/flashcards/page.tsx` | Flip + swipe-to-navigate flashcards for one B2 Module | `components/GlossarCard`, `components/SwipeNav`, `hooks/useGlossarData`, `store/uiStore`, shared chrome components | Next.js (`/glossar/b2/[kapitel]/[module]/flashcards`) |
+| `app/ielts/page.tsx` | IELTS section-group picker (`IELTS_SECTION_GROUPS`) | `hooks/useIELTSData`, shared chrome components | Next.js (`/ielts`) |
+| `app/ielts/[group]/page.tsx` | Category list within a group; branches vocab vs. speaking per category via `isIELTSSpeakingSection` | `hooks/useIELTSData`, `hooks/useIELTSSpeakingData`, shared chrome components | Next.js (`/ielts/[group]`) |
+| `app/ielts/[group]/[section]/page.tsx` | Word/question list for one category; resume via `ieltsListIndexKey` | `hooks/useIELTSData`, `hooks/useIELTSSpeakingData`, `store/uiStore`, shared chrome components | Next.js (`/ielts/[group]/[section]`) |
+| `app/ielts/[group]/[section]/flashcards/page.tsx` | Flip + swipe-to-navigate flashcards for vocabulary or speaking | `components/FlashCard`, `components/SpeakingCard`, `components/SwipeNav`, `components/StatChip`, `hooks/useIELTSData`, `hooks/useIELTSSpeakingData`, `store/uiStore`, shared chrome components | Next.js (`/ielts/[group]/[section]/flashcards`) |
+| `components/AppButton.tsx` | Bordered action button (prev/next, start/continue) | `components/Pressable`, `theme/*` | List and flashcards screens |
+| `components/ArtikelCard.tsx` | German Artikel drag-to-answer card with feedback overlay | `hooks/useGermanData`, `theme/*` | `app/german/[level]/page.tsx` |
+| `components/FlashCard.tsx` | IELTS vocabulary flip card | `components/StatusBadge`, `hooks/useIELTSData`, `theme/*` | `app/ielts/[group]/[section]/flashcards/page.tsx` |
+| `components/GlossarCard.tsx` | Glossar flip card | `hooks/useGlossarData`, `theme/*` | Both Glossar flashcards screens |
+| `components/NavBar.tsx` | Back button + title + right slot | `components/Pressable`, `theme/*` | Every non-home screen |
+| `components/Pressable.tsx` | Pointer-events-based tap target (mouse/touch/keyboard) | - | Nearly every interactive component and screen |
+| `components/Scales.tsx` | Decorative striped page-edge border (`position: fixed`) | `theme/*` | Every screen |
+| `components/SpeakingCard.tsx` | IELTS speaking flip card with cue-card points | `components/StatusBadge`, `hooks/useIELTSSpeakingData`, `theme/*` | `app/ielts/[group]/[section]/flashcards/page.tsx` |
+| `components/StatChip.tsx` | Bordered label/value stat display | `theme/*` | German, IELTS, and Glossar flashcards screens |
+| `components/StatusBadge.tsx` | Small bordered uppercase label chip | `theme/*` | `components/FlashCard.tsx`, `components/SpeakingCard.tsx` |
+| `components/SwipeNav.tsx` | Pointer-events drag wrapper firing `onSwipeLeft`/`onSwipeRight` | - | All three flashcards screens (non-German) |
+| `components/ThemeToggle.tsx` | Sun/moon icon toggle button (`lucide-react`) | `theme/ThemeContext` | Every screen (`NavBar`'s right slot / home header) |
+| `hooks/useGermanData.ts` | German Artikel data map/cache, async loaders, shuffle helper | - | `app/german/page.tsx`, `app/german/[level]/page.tsx`, `components/ArtikelCard.tsx` |
+| `hooks/useGlossarData.ts` | Glossar data maps/caches (non-B2, B2 meta, B2 Module) and async loaders; `isB2Level`, level labels/counts | - | All Glossar screens, `components/GlossarCard.tsx` |
+| `hooks/useIELTSData.ts` | IELTS vocabulary data map/cache, `IELTS_SECTION_GROUPS`, `getSectionGroupId`, async loaders | - | All IELTS screens, `app/page.tsx`, `components/FlashCard.tsx` |
+| `hooks/useIELTSSpeakingData.ts` | IELTS speaking-topic data map/cache, `isIELTSSpeakingSection`, async loaders | - | `app/ielts/[group]/page.tsx`, `app/ielts/[group]/[section]/*`, `components/SpeakingCard.tsx` |
+| `hooks/useProgress.ts` | German-only correct/incorrect score tracking, backed by `lib/storage` | `store/progressStore`, `lib/storage` | `app/german/page.tsx`, `app/german/[level]/page.tsx` |
+| `store/progressStore.ts` | `GermanWordScore`/`GermanProgressMap` types, `STORAGE_KEYS.GERMAN_PROGRESS` | - | `hooks/useProgress.ts` |
+| `store/uiStore.ts` | `UI_STORAGE_KEYS`, `ieltsListIndexKey`, `glossarListIndexKey` | - | `app/page.tsx` and every list/flashcards screen |
+| `theme/ThemeContext.tsx` | `ThemeProvider`/`useTheme`, light/dark `ThemeColors`, `localStorage`-backed mode persistence, OS-preference fallback | `lib/storage` | Every screen and component |
+| `theme/typography.ts` | `FONT_FAMILY`, `FONT_WEIGHTS`, `FONT_SIZES` tokens | - | Every screen and component |
+| `constants/glossarKapitelTitles.ts` | Per-level, per-Kapitel display-title lookup table, `getGlossarKapitelTitle` | - | `app/glossar/[level]/page.tsx`, `app/glossar/b2/[kapitel]/page.tsx` |
+| `lib/storage.ts` | `getItem`/`setItem`/`removeItem` - `AsyncStorage`-shaped wrapper around `window.localStorage` | - | `hooks/useProgress.ts`, `theme/ThemeContext.tsx`, `store/uiStore.ts` callers (every list/flashcards screen), `app/page.tsx` |

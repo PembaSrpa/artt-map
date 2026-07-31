@@ -1,0 +1,63 @@
+---
+title: Interaction & Theming
+order: 5
+---
+
+With no gesture or animation library, every draggable/pressable behavior in this app is built directly on the browser's Pointer Events API and CSS transforms/transitions.
+
+## `Pressable`: a tap target that works with mouse, touch, and keyboard
+
+`components/Pressable.tsx` is the base interactive primitive nearly every button-like element in the app is built from. It's a `<div role="button">` (not a native `<button>`, so it can wrap arbitrary layout content) that:
+
+- Tracks a local `pressed` boolean via `onPointerDown`/`onPointerUp`/`onPointerLeave`/`onPointerCancel` - one event model covering mouse, touch, and pen input, rather than separate mouse and touch handlers.
+- Exposes that `pressed` state to its `style` and `children` props, both of which can be either a plain value or a `(state: { pressed }) => value` function - this is why call sites throughout the app write `style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, ... })}`, matching React Native's `Pressable` API shape closely enough that porting a screen from the mobile app mostly means swapping RN View/Text tags for `div`/`span` and RN style objects for CSS ones.
+- Handles `onKeyDown` for Enter/Space so keyboard users can activate it like a real button, and calls `event.stopPropagation()` in its click handler so nested Pressables (e.g. a card's flip-toggle wrapping prev/next buttons) don't double-fire.
+
+## `SwipeNav`: swipe-to-navigate wrapper for flashcards screens
+
+`components/SwipeNav.tsx` wraps a flashcards screen's card and turns a horizontal drag into `onSwipeLeft`/`onSwipeRight` calls - the web equivalent of the mobile app's `Gesture.Pan()` on the Glossar/IELTS flashcards screens:
+
+- `onPointerDown` captures the pointer (`setPointerCapture`) and records the starting `clientX`.
+- `onPointerMove` updates a `translateX` state value, applied live via `transform: translateX(${translateX}px)` with no transition while dragging, so the card tracks the pointer 1:1.
+- `onPointerUp` compares the final `translateX` against `SWIPE_THRESHOLD` (60px): past the threshold left or right, it calls `onSwipeLeft`/`onSwipeRight`; either way `translateX` resets to `0`, animated back with a `250ms ease` transition once dragging ends.
+- A `dragDistance` ref tracks total movement, and `onClickCapture` suppresses the click event if that distance exceeds `DRAG_CLICK_SUPPRESS_THRESHOLD` (10px) - without this, releasing a drag would also fire a click on whatever's underneath the pointer (e.g. flipping the card unintentionally right after a swipe).
+
+This is purely a navigation trigger layered on top of the same prev/next `AppButton`s shown below every card - unlike the German Artikel card below, a Glossar/IELTS swipe never carries the card off-screen and never *is* the answer; it only calls `goNext`/`goPrev`.
+
+## `ArtikelCard`: swipe-to-answer for Deutsch Artikel
+
+`components/ArtikelCard.tsx` is the one place a drag gesture is the actual game input:
+
+- Tracks both `x` and `y` pointer movement (`translate: { x, y }`), applying `transform: translate(${x}px, ${y}px) rotate(${x / 20}deg)` live while dragging - the slight rotation proportional to horizontal distance gives the card a "flicked" feel.
+- On release, compares `absX`/`absY` against `SWIPE_THRESHOLD` (100px): a dominant horizontal drag maps to `das` (right) or `der` (left); a dominant *downward* drag (`y > SWIPE_THRESHOLD && absY > absX`) maps to `die`. Anything under threshold just snaps back to `{ x: 0, y: 0 }`.
+- Unlike the mobile app's version (which animates the card fully off-screen on a correct/incorrect swipe), this web version always resets `translate` back to the center - feedback is communicated entirely through the `feedbackBorder` overlay (a colored ring that fades in via `opacity` transition, green for correct/red for incorrect) and a result mark (✓/✕) plus the correct-answer label, not by the card leaving the viewport.
+- `touchAction: "none"` on the card prevents the browser's native touch-scroll/zoom gestures from fighting the drag on touchscreens.
+- The three direction hints (`← der`, `↓ die`, `das →`) use the same `GENDER_COLORS` map as the mobile app (der blue `#3b82f6`, die red `#ef4444`, das green `#22c55e`), and the matching hint's border is highlighted once feedback is showing.
+
+## Flip cards: `FlashCard`, `GlossarCard`, `SpeakingCard`
+
+All three implement the identical flip mechanic with pure CSS, no JS-driven animation:
+
+```text
+outer div (perspective: 1200)
+└── inner div (transformStyle: preserve-3d, transition: transform 300ms ease,
+               transform: rotateY(flipped ? 180 : 0)deg)
+    ├── front face (backfaceVisibility: hidden)
+    └── back face  (backfaceVisibility: hidden, transform: rotateY(180deg))
+```
+
+Because both faces are absolutely stacked and each has `backface-visibility: hidden`, rotating the shared inner wrapper is enough for the browser to swap which face is visible partway through the animation - there's no manual opacity/interpolation math like the mobile app's Reanimated version needs. All three are simple `onClick`/`role="button"` divs (going through `Pressable`'s tap-and-hold-state pattern isn't needed here since a card flip has no "held" visual state).
+
+`FlashCard` and `SpeakingCard` additionally reset their inner content's scroll position (`scrollTop = 0`) via a `ref` + `useEffect` whenever the word/question or `flipped` state changes, so scrolling down to read a long definition/answer and then moving to the next card doesn't carry that scroll position over. `GlossarCard` doesn't need this since Glossar content is short enough to never scroll.
+
+## Theming
+
+`theme/ThemeContext.tsx` is a plain React Context provider - no external state library. On mount it checks `localStorage` (key `cards_theme_mode`) for a saved `"light"`/`"dark"` preference; if none is saved, it falls back to `window.matchMedia("(prefers-color-scheme: dark)")`. `toggleTheme` flips the mode and persists the new value. A side-effect `useEffect` also pushes the resolved background color onto `document.documentElement`/`document.body` directly, so the page's own background (outside of any styled container) matches the theme instead of flashing white/black at the edges.
+
+`ThemeColors` has the same six roles as the mobile app (`background`, `backgroundAlt`, `text`, `textMuted`, `border`, `accent`), with the same hex values in both light and dark palettes - this app and its mobile sibling are visually matched down to the exact accent yellow (`#EAB308` light / `#FACC15` dark).
+
+`theme/typography.ts` exports `FONT_FAMILY` (a CSS font stack starting with `'JetBrains Mono'` and falling through several monospace system fonts), `FONT_WEIGHTS` (`regular`/`medium`/`bold` → 400/500/700), and `FONT_SIZES` (`xs` through `xxl`, 11-36px) - loaded via a Google Fonts `<link>` tag in `app/layout.tsx` (with `preconnect` hints) rather than `next/font`, so unlike a `next/font`-managed font this one does depend on a network fetch to Google Fonts at page-load time rather than being self-hosted or bundled.
+
+## `Scales`: decorative page-edge border
+
+`components/Scales.tsx` renders `position: fixed` striped bars along the page's left/right (and optionally bottom) edges via a `repeating-linear-gradient` CSS background, sized by a `variant` (`"compact"` 16px, `"spacious"` 24px, `"large"` 36px) and an `edges` array. It's rendered on nearly every screen as a purely visual motif with `pointerEvents: "none"`, matching the mobile app's `Scales` component in spirit though implemented with CSS gradients instead of an SVG/View-based hairline pattern.

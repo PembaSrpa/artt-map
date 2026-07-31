@@ -1,0 +1,29 @@
+---
+title: Model Comparison
+order: 7
+---
+
+A direct side-by-side of the two pipelines documented in `05-ml-pipeline-sunless.mdx` and `06-ml-pipeline-frank.mdx`, for quick reference.
+
+| | Sunless (`Pemba/`) | Frank (`Pranay/`) |
+| --- | --- | --- |
+| Historical data source | eloratings.net (scraped per-team TSV) | `martj42/international_results` (downloaded CSV, ~50k rows) |
+| Elo ratings | Sourced pre-computed from eloratings.net | Computed in-house (`compute_elo_history`, k=32, base 1500) |
+| Match filtering | Excludes friendlies via `is_friendly` (tournament code check) | Filters to an explicit allow-list, `COMPETITIVE_TOURNAMENTS` (WC, continental championships, Confederations Cup) |
+| History window | `MIN_MATCH_DATE` 2010-01-01 | `MIN_YEAR` 2000 |
+| Feature count | 21 (`FEATURE_COLS`) | 16 (`FEATURE_COLS`) |
+| Distinctive features | `win_rate_vs_top`/`defensive_solidity` (performance vs Elo ≥ 1900 opponents) | `stage_importance` (tournament-tier weight), `neutral` (WC neutral-venue flag) |
+| Cold-start handling | Missing team history → `None`/`NaN`, left for XGBoost's native missing-value handling | Missing team history → hardcoded default form stats (45% win rate, etc.), never `NaN` |
+| Model type | 3× `XGBRegressor` regressed onto 0/1 outcome labels | 3× `XGBClassifier`, one-vs-rest binary, `predict_proba` |
+| `n_estimators` / `max_depth` | 500 / 4 | 300 / 4 |
+| Probability normalization | Clip negatives, divide by row sum (all three symmetric) | `p_win`/`p_draw` divided by raw-probability sum; `p_loss = 1 - p_win - p_draw` |
+| Knockout draw handling | Explicitly redistributes `p_draw` into `p_win`/`p_loss` for any non-`"group"` stage | No special-casing - `p_draw` can be nonzero even in a knockout stage |
+| Train/val/test split | Date-based: train ≤ 2023-12-31, val ≤ 2025-12-31, test after | Temporal 80/20 positional split (first 80% of the date-sorted history trains, last 20% tests) plus `StratifiedKFold` cross-validation |
+| Output `"model"` field | Not present | `"model": "frank"` on every prediction object |
+| Standalone fixture-fetch script | No (fetching is inline in `run_train.py`/`run_predict.py`) | Yes - `fetch_fixtures.py` |
+| SHAP explanations | From the `p_win` explainer only, per match | From the `p_win` explainer only, per match |
+| Scoring rule (both, post-hoc in the frontend) | RPS (`computeRPS`, see `04-scoring-and-leaderboard.mdx`) | RPS (same) |
+
+## What this means for comparing them
+
+Because the two pipelines share no code, no cached data, and no feature-engineering logic, a difference in RPS on the leaderboard reflects a genuine difference in modeling approach (data source, Elo methodology, classifier-vs-regressor framing, knockout-draw handling) rather than two copies of the same idea with different hyperparameters. The one thing they're evaluated on identically is the RPS formula itself and the actual match results, both live only in `App/`.

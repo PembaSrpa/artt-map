@@ -1,0 +1,60 @@
+---
+title: File Reference
+order: 8
+---
+
+Split by project. Bundled/generated JSON (fixtures, predictions, `training_matrix.csv`) is covered by pattern in earlier pages rather than listed individually.
+
+## `App/`
+
+| File | Purpose | Imports from | Imported by |
+| --- | --- | --- | --- |
+| `app/layout.tsx` | Root layout - font link, `Scales`, `Nav`, page container | `components/Nav`, `components/Scales` | Next.js (root layout) |
+| `app/page.tsx` | `/` - stage-tabbed match list with stats bar | `components/MatchCard`, `lib/data`, `lib/types` | Next.js (`/`) |
+| `app/groups/page.tsx` | `/groups` - group standings | `components/GroupTable`, `lib/data`, `lib/types` | Next.js (`/groups`) |
+| `app/bracket/page.tsx` | `/bracket` - knockout bracket | `components/BracketView`, `lib/data`, `lib/types` | Next.js (`/bracket`) |
+| `app/leaderboard/page.tsx` | `/leaderboard` - model RPS comparison, own inline table | `lib/data`, `lib/utils`, `lib/types` | Next.js (`/leaderboard`) |
+| `app/login/page.tsx` | `/login` - Supabase email/password sign-in (orphaned, unlinked) | `lib/supabase` | Next.js (`/login`), links to `/signup` |
+| `app/signup/page.tsx` | `/signup` - Supabase sign-up + `users` row insert (orphaned, unlinked) | `lib/supabase` | Next.js (`/signup`), links to `/login` |
+| `app/api/fixtures/route.ts` | Server route - proxies football-data.org, converts to NST | `lib/types` (types only) | `lib/data.ts`'s `fetchFixtures` |
+| `components/Nav.tsx` | Sticky top tab bar | - | `app/layout.tsx` |
+| `components/MatchCard.tsx` | Single fixture card with both models' `ProbBar`s | `components/ProbBar`, `lib/utils`, `lib/types` | `app/page.tsx` |
+| `components/ProbBar.tsx` | One model's win/draw/loss segmented bar | `lib/utils`, `lib/types` | `components/MatchCard.tsx` |
+| `components/GroupTable.tsx` | Client-computed group standings table | `lib/types` | `app/groups/page.tsx` |
+| `components/BracketView.tsx` | Knockout bracket columns | `lib/types` | `app/bracket/page.tsx` |
+| `components/LeaderboardTable.tsx` | Richer human+model leaderboard table (unused - see `03-frontend-components.mdx`) | `lib/utils`, `lib/types` | Not imported anywhere |
+| `components/Scales.tsx` | Decorative fixed striped edge borders | - | `app/layout.tsx` |
+| `lib/types.ts` | All shared TS types: `Fixture`, `Prediction`, `EnrichedMatch`, `LeaderboardRow`, stage maps | - | Nearly every file in `app/`/`components/`/`lib/` |
+| `lib/data.ts` | `fetchFixtures`, `fetchPredictions`, `enrichFixtures`, `computeRPS` | `lib/types` | Every page except login/signup |
+| `lib/utils.ts` | `modelTextColor`, `formatDate` | `lib/types` (types only) | `components/ProbBar.tsx`, `components/MatchCard.tsx`, `components/LeaderboardTable.tsx`, `app/leaderboard/page.tsx` |
+| `lib/supabase.ts` | Supabase client (`null` if env vars unset), `AppUser` type | `@supabase/supabase-js` | `app/login/page.tsx`, `app/signup/page.tsx` |
+
+## `Pemba/` (Sunless)
+
+| File | Purpose |
+| --- | --- |
+| `run_train.py` | CLI entry point - scrape Elo, build training matrix, train, save |
+| `run_predict.py` | CLI entry point (`--stage`, `--no-cache`) - load Elo, fetch fixtures, predict, write |
+| `src/config.py` | Paths, API config, `XGB_PARAMS`, `FEATURE_COLS`, `WC2026_TEAMS` (48-team hardcoded roster), stage encodings |
+| `src/scrape.py` | `fetch_elo_tsv`/`fetch_all_elo` (eloratings.net), `fetch_wc2026_fixtures` (football-data.org) |
+| `src/team_codes.py` | `CODE_TO_NAME` - 2-letter eloratings.net country codes to full names |
+| `src/features.py` | `build_match_features`, `build_training_matrix`, `build_prediction_features` |
+| `src/train.py` | `train`/`save`/`load`/`evaluate_test`, `rps`/`rps_dataset`, `normalize_preds`, date-based `split_data` |
+| `src/predict.py` | `predict_fixtures` (incl. knockout draw-split), `write_predictions`, `load_wc2026_fixtures` |
+
+## `Pranay/` (Frank)
+
+| File | Purpose |
+| --- | --- |
+| `run_train.py` | CLI entry point - load history, compute Elo, engineer features, train, save |
+| `run_predict.py` | CLI entry point (`--stage`) - load models, load history + Elo, predict, write |
+| `fetch_fixtures.py` | Standalone script - fetches/copies `wc2026_fixtures.json` into this project and `App/public/fixtures/` |
+| `src/config.py` | Paths, `MODEL_NAME = "frank"`, `XGB_PARAMS`, `FEATURE_COLS`, `COMPETITIVE_TOURNAMENTS`, `STAGE_IMPORTANCE_MAP`, `TEAM_NAME_MAP` |
+| `src/features.py` | `download_results`/`load_history`, `compute_elo_history`/`elo_at`, `rolling_form`, `head_to_head`, `build_feature_row` |
+| `src/train.py` | `train` (temporal 80/20 split, `XGBClassifier` × 3, `StratifiedKFold` CV), `save`/`load` |
+| `src/predict.py` | `load_wc2026_fixtures`, `predict_fixtures` (no knockout special-casing), `write_predictions` |
+
+## Notable cross-project observations
+
+- Both `Pemba/` and `Pranay/` independently reimplement a `run_train.py`/`run_predict.py` CLI pair, a `config.py`, a `features.py`, a `train.py`, and a `predict.py` with the same names and similar responsibilities, but zero shared code between them - see `07-model-comparison.mdx` for how their actual implementations diverge underneath the matching filenames.
+- `components/LeaderboardTable.tsx` in `App/` is dead code in the sense that nothing imports it, but it's not obviously safe to delete - see the "unfinished feature" note in `03-frontend-components.mdx` and `04-scoring-and-leaderboard.mdx`.
