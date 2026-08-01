@@ -1,0 +1,31 @@
+---
+title: Feature Extraction
+order: 4
+---
+
+`featuresExt.py`'s `featureExtraction(url)` produces a fixed 22-value feature vector, in a fixed order, from a single URL string - the same 22 columns (in the same order) that `dataset.csv` was built from, which is what makes the pre-trained `model.pkl` usable directly against this function's live output.
+
+## The 22 features, grouped by what they measure
+
+**Pure string/structure counts** (no network calls, instant, deterministic from the URL text alone): `url_length`, `having_ip_address` (regex-matches IPv4/hex/IPv6-looking patterns in the URL), `count_dots`, `count_hyphens`, `count_at`, `count_qm`, `count_and`, `count_equal`, `count_percentage`, `count_slash`, `count_colon`, `count_semicolumn`, `check_www`, `check_com`, `count_double_slash`, `https_token` (0 if the scheme is `https`, 1 otherwise), `prefix_suffix` (hyphen between the domain's `http(s)://` and the first `/`), `phish_hints` (counts occurrences of any of 22 hardcoded suspicious keywords - `login`, `secure`, `paypal`, `bank`, `verification`, etc. - in the URL), `shortening_service` (regex-matches ~50 known URL-shortener domains).
+
+**Network-dependent features** (each makes a live outbound request or DNS/WHOIS lookup when the URL isn't already blacklisted):
+
+- **`whois_registered_domain`** - queries WHOIS for the domain and checks whether the registered domain name actually appears in the URL's own domain; returns `1` (suspicious) on any mismatch or on any exception (including a WHOIS lookup failure, timeout, or rate limit).
+- **`domainAge`** - also a WHOIS query; returns the number of days between the domain's creation and expiration dates, or `-1` if either date is unavailable or the lookup fails.
+- **`google_index`** - scrapes a Google search results page (`google.com/search?q=info:<url>`) with a hardcoded 2016-era Chrome user-agent string and a fixed `0.6`s sleep before each request (a crude rate-limit avoidance measure), parsing the HTML with BeautifulSoup to guess whether the URL shows up as indexed. This depends on Google's search results HTML structure staying stable and on Google not blocking/CAPTCHA-ing the request - a scraping approach that's inherently fragile against a page Google can and does change without notice, and against automated-traffic detection.
+- **`web_traffic`** - fetches `http://data.alexa.com/data?cli=10&dat=s&url=<url>` and parses an XML `REACH`/`RANK` attribute out of the response.
+
+## `web_traffic` calls a discontinued API
+
+Amazon shut down Alexa Internet's traffic-ranking service in **May 2023**, and `data.alexa.com` (the exact endpoint this function calls) has not been serving data since. In the current codebase, every call to `web_traffic` will fail its HTTP request (the domain either won't resolve or won't return valid data), fall into the function's `except: return 0` branch, and always return `0`. This means one of the model's 22 training features - which had real, meaningfully-varying historical Alexa ranks in `dataset.csv` at training time - is now a **constant zero for every live prediction**, regardless of how popular or obscure the actual site is. This doesn't break the app (it degrades gracefully to `0`, exactly like any other WHOIS/network failure), but it does mean the live model is silently missing whatever discriminative signal `web_traffic` contributed during training, for every single URL checked today.
+
+## Feature order is consistent between training and inference
+
+`model.py` builds its training feature matrix by taking every `dataset.csv` column except `status` and `url`, in the CSV's own column order - and that column order (`length_url`, `ip`, `nb_dots`, `nb_hyphens`, ... `web_traffic`) matches the order `featureExtraction` appends its 22 features in, one-for-one. This consistency matters because `predictor.py` calls `model.predict([df])` with a plain Python list (not a labeled `DataFrame`/dict), so scikit-learn/XGBoost has no column names to align by - it trusts positional order entirely. If a future edit reordered `featureExtraction`'s `features.append(...)` calls (or `dataset.csv`'s columns) without keeping both in sync, predictions would silently use the wrong feature values for the wrong feature slots, with no error raised anywhere.
+
+## One regex in `having_ip_address` is broader than it looks
+
+The function's final alternative, `'[0-9a-fA-F]{7}'`, matches any 7-character run of hex-range characters (`0-9`, `a-f`, `A-F`) **anywhere** in the URL - not just where an IP-address-like pattern would be. This is meaningfully looser than the well-formed IPv4/hex-IP/IPv6 patterns that precede it in the same regex, and could match incidentally inside an ordinary path, query string, or hash fragment that happens to contain 7 consecutive hex-range characters with no actual IP-address meaning.
+
+> ⚠️ Unclear: whether this causes visible false positives in practice on real-world URLs wasn't tested against live traffic - it's a property of the regex as written, not a confirmed misclassification.

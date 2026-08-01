@@ -1,0 +1,61 @@
+---
+title: Overview
+order: 1
+---
+
+Expense Tracker is a **backend-only** project - a FastAPI REST API for logging income/expense transactions against categories, setting a monthly budget per category, and getting analytics/charts/CSV exports/ML-based spending predictions back. There's no frontend application in this repository; `test_charts.html` is a static, manually-opened HTML page for eyeballing the chart endpoints during development, not a served app route (see `06-scripts-and-tests.mdx`).
+
+## What it does
+
+- **Transactions** - add/edit/delete income or expense entries, each tagged with a category, filterable by date range/category/type.
+- **Categories** - a flat list of income or expense categories (e.g. Food, Rent, Salary), referenced by name from the API rather than by numeric ID.
+- **Budgets** - one optional monthly spending limit per expense category, with alert levels (info/warning/critical) once a category crosses 80/90/100% of its limit for the current month.
+- **Analytics** - spending-by-category, monthly trends, day-of-week spending patterns, unusually large transactions, and savings suggestions - all computed with `pandas` from the raw transaction table on every request (no precomputed/cached aggregates).
+- **Visualizations** - matplotlib-rendered PNG charts returned as base64 strings. Only half of the six chart endpoints are actually implemented - see `05-visualizations-and-exports.mdx`.
+- **Predictions** - two entirely separate prediction systems live side by side: a simple historical-average predictor (`analytics.py`) and a `scikit-learn` linear-regression-based forecaster (`ml_predictions.py`), exposed through different, similarly-named endpoints - see `04-analytics-and-predictions.mdx`.
+- **Export** - transactions, budgets, or a summary report, each as a downloadable CSV.
+
+There's no authentication anywhere in this API - every endpoint is open, and there's no concept of a "user" in the data model at all (see `02-data-model-and-database.mdx`) - this is a single-tenant personal tool, not a multi-user service.
+
+## Stack
+
+- **FastAPI** + **Uvicorn**, **SQLAlchemy** (Core ORM, no async), **Pydantic v2** for request/response models
+- **PostgreSQL** (via `psycopg2-binary`), specifically set up for a Supabase-hosted database (see `02-data-model-and-database.mdx`) - though `PyMySQL` is also still listed in `requirements.txt`, and several of the root-level scripts (`test_connection.py`, comments in `reset_db.py`) still reference MySQL directly, strongly suggesting this project started on MySQL and was migrated to Postgres/Supabase without fully cleaning up the leftover MySQL-era dependency and scripts.
+- **`pandas`** for nearly all analytics aggregation (grouping, resampling, rolling windows)
+- **`scikit-learn`** (`LinearRegression` only) for the ML forecasting endpoints
+- **`matplotlib`** (`Agg` backend, for headless server rendering) for chart generation
+- **`APScheduler`** is a listed dependency, but isn't imported or used anywhere in `backend/` - there's no scheduled/background job in this codebase despite the dependency being present.
+
+## Running locally
+
+```bash
+pip install -r requirements.txt
+python init_db.py                  # creates tables + a small starter category set
+# or, for a richer category list:
+python add_default_categories.py
+python add_sample_data.py          # optional - 100 random transactions + budgets
+uvicorn backend.main:app --reload
+```
+
+Requires `DATABASE_URL` (or the individual `DB_HOST`/`DB_USER`/`DB_PASSWORD`/`DB_NAME`/`DB_PORT` variables) in a `.env` file - both `.env` and `.env.*` are correctly gitignored, and no `.env` file was present in this checkout.
+
+## A deployment-config discrepancy worth knowing about
+
+`Procfile` starts the app with `uvicorn backend.main:app` (the module path used everywhere else in this project, including every root-level script's imports), but `render.yaml`'s `startCommand` uses `uvicorn main:app` instead - without the `backend.` prefix. Since `main.py` lives inside the `backend/` package and every internal import in this codebase uses `from backend import ...`/`from backend.models import ...`, `render.yaml`'s command would only work if Render's working directory were set to inside `backend/` itself (which nothing else in the config indicates), while the `Procfile` command matches the project's actual layout. If deploying via `render.yaml`, this is worth double-checking against whichever platform actually ends up serving the app.
+
+## Top-level structure
+
+| Path | Purpose |
+| --- | --- |
+| `backend/main.py` | The FastAPI app - every route, all Pydantic request/response models |
+| `backend/database.py` | SQLAlchemy engine/session setup, `DATABASE_URL` resolution |
+| `backend/models.py` | The three SQLAlchemy models: `Category`, `Transaction`, `Budget` |
+| `backend/crud.py` | Direct database read/write functions, keyed by numeric IDs |
+| `backend/analytics.py` | `pandas`-based aggregation + the simple average-based predictor |
+| `backend/ml_predictions.py` | `scikit-learn` linear-regression-based forecasting |
+| `backend/visualizations.py` | matplotlib chart generation (half-implemented - see `05-visualizations-and-exports.mdx`) |
+| `backend/exports.py` | CSV generation for transactions/budgets/summary |
+| `init_db.py`, `reset_db.py`, `add_default_categories.py`, `add_sample_data.py`, `generate_ml_data.py` | Standalone CLI scripts for setting up/seeding/wiping the database - see `06-scripts-and-tests.mdx` |
+| `test_*.py` (6 files) | Manual, print-based smoke-test scripts - not `pytest`/`assert`-based despite the `test_` naming - see `06-scripts-and-tests.mdx` |
+| `test_charts.html` | A static page for manually viewing the visualization endpoints' output during development |
+| `gitcommit.py` | A personal dev-workflow shortcut (stage/commit/push with a hardcoded message) - not part of the app |

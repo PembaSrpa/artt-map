@@ -1,0 +1,52 @@
+---
+title: API Reference
+order: 3
+---
+
+Everything lives in `backend/main.py` - a single FastAPI app with CORS wide open (`allow_origins=["*"]`, `allow_credentials=True`) and no authentication dependency on any route.
+
+> ⚠️ Worth knowing: `allow_origins=["*"]` combined with `allow_credentials=True` is a combination most browsers won't actually honor for credentialed requests (cookies/`Authorization` headers) - the CORS spec disallows a wildcard origin alongside `Access-Control-Allow-Credentials: true`, so browsers will block sending credentials to this API from a page on another origin even though the server declares it allows any origin. This likely isn't an active problem today since nothing in this API currently relies on cookies or browser-managed credentials, but it's a config combination worth revisiting if that ever changes.
+
+## Transactions
+
+| Method & path | Notes |
+| --- | --- |
+| `POST /transactions` | Body includes `category_name`; 404s with a list of available category names if it doesn't match an existing category |
+| `GET /transactions` | Filters: `skip`, `limit`, `category_name`, `start_date`, `end_date`, `transaction_type`. An unrecognized `category_name` silently returns unfiltered results (the lookup just leaves `category_id` as `None`) rather than erroring |
+| `GET /transactions/{transaction_id}` | 404 if not found |
+| `PUT /transactions/{transaction_id}` | Partial update (`exclude_unset=True`) - only fields present in the request body are changed |
+| `DELETE /transactions/{transaction_id}` | 404 if not found |
+
+## Categories
+
+| Method & path | Notes |
+| --- | --- |
+| `POST /categories` | No uniqueness pre-check at this layer - relies on the database's `UNIQUE` constraint on `name`, so a duplicate name would surface as a raw database integrity error rather than a clean `400` |
+| `GET /categories` | Optional `type` filter (`"income"`/`"expense"`) |
+
+## Budgets
+
+| Method & path | Notes |
+| --- | --- |
+| `POST /budgets` | 404 if the category name doesn't exist (lists available expense categories); 400 if a budget for that category already exists |
+| `GET /budgets` | All budgets |
+| `GET /budgets/{category}` | Looked up **by category name**, not budget ID - the one budget-related read route that's keyed differently from the rest |
+| `DELETE /budgets/{budget_id}` | Keyed by budget ID |
+
+**There is no `PUT /budgets/{id}` route.** `crud.update_budget` is fully implemented (updates `monthly_limit`/`start_date`) but nothing in `main.py` calls it - the only way to change a budget's limit through this API today is to delete it and create a new one.
+
+## Analytics
+
+All under `/analytics`, all read-only, all backed by `backend/analytics.py` - see `04-analytics-and-predictions.mdx` for what each one actually computes: `spending-by-category`, `income-expense`, `budget-vs-actual/{category_id}` (this one takes `category_id` directly, not a name, unlike the rest of this API - the one other inconsistency in ID-vs-name addressing besides the budgets route above), `monthly-trend`, `category-trend/{category}`, `spending-patterns`, `top-categories`, `unusual-spending`, `savings-opportunities`, `predict-spending`, `budget-alerts`.
+
+## Visualizations
+
+All under `/visualizations`, each returning `{"image": "<base64>", "format": "base64"}` - a PNG chart encoded as base64 rather than a raw image response, so the caller has to decode and render it themselves rather than pointing an `<img src>` directly at the endpoint. See `05-visualizations-and-exports.mdx` for which of these six are actually implemented.
+
+## Export
+
+All under `/export`, each returning a `text/csv` `StreamingResponse` with a `Content-Disposition: attachment` header (so a browser hitting the URL directly triggers a file download): `transactions`, `budgets`, `summary`.
+
+## Predictions
+
+All under `/predictions`, backed by `backend/ml_predictions.py`'s `scikit-learn` regression rather than `analytics.py`'s simple average (see `04-analytics-and-predictions.mdx` for the distinction): `next-month`, `next-month-advanced` (the seasonality-weighted variant), `by-category`, `budget-exhaustion/{category_id}`, `next-year`.

@@ -1,0 +1,52 @@
+---
+title: Overview
+order: 1
+---
+
+This is a small Flask web app: a person pastes a URL into a form, the app extracts 22 structural/network-derived features from it, runs them through a pre-trained classifier, and shows "Phishy" or "Legitimate." URLs already flagged once are cached in a local SQLite blacklist so they're recognized instantly on repeat checks without re-running the model or re-fetching network data.
+
+## What it does
+
+1. **`/`** - a static landing page describing what phishing is and linking to the checker.
+2. **`/catch_phish`** - a form to submit a URL (`GET` shows the form, `POST` redirects to the results page with the URL as a query param).
+3. **`/results`** - runs `predictor.classifyURL(url)` and shows the verdict.
+
+## A few corrections to what the README claims
+
+- **`requirements.txt` doesn't exist in this repository**, despite the README's setup instructions telling the reader to run `pip install -r requirements.txt`. Based on the actual imports across every `.py` file, the real dependency list is: `Flask`, `Flask-SQLAlchemy`, `pandas`, `numpy`, `scikit-learn`, `xgboost`, `matplotlib`, `seaborn`, `beautifulsoup4`, `requests`, `python-whois`.
+- **The blacklist database file is `url_blacklist.db`** (confirmed both by `database.py`'s `SQLALCHEMY_DATABASE_URI` and the actual `instance/url_blacklist.db` file present in this checkout), not `phishing.db` as the README's troubleshooting section states.
+- **`model.py` doesn't just train an XGBoost model.** It trains and hyperparameter-tunes three classifiers - Random Forest, XGBoost, and Decision Tree, each via `GridSearchCV` - evaluates all three on the held-out test set, and saves **whichever one scored the highest test accuracy** as `model.pkl` (alongside separately saving each of the three individually, as `random_forest_model.pkl`, `xgboost_model.pkl`, `decision_tree_model.pkl`). The README's "trains a high-accuracy XGBoost classifier" description oversells this as XGBoost-specific when the live app's model could just as easily be whichever of the three actually won on this particular run - see `05-model-training.mdx`.
+
+## Stack
+
+- **Flask** (routes + Jinja2 templates, no JS framework - the three HTML pages are plain server-rendered templates with inline `<style>` blocks)
+- **Flask-SQLAlchemy** + **SQLite** for the URL blacklist (one table, no migrations)
+- **scikit-learn** (`RandomForestClassifier`, `DecisionTreeClassifier`, `GridSearchCV`) and **XGBoost** (`XGBClassifier`) for training; whichever `.pkl` ends up as `model.pkl` is what the live app actually loads
+- **`python-whois`**, **`requests`** + **`BeautifulSoup4`** for network-dependent feature extraction (WHOIS lookups, a Google-index check, a legacy web-traffic-rank check) - see `04-feature-extraction.mdx` for why one of these no longer works
+- **`pandas`**, **`matplotlib`**, **`seaborn`** for the training pipeline's dataset handling and chart generation
+
+## Running locally
+
+```bash
+pip install flask flask-sqlalchemy pandas numpy scikit-learn xgboost matplotlib seaborn beautifulsoup4 requests python-whois
+python model.py     # trains all three models, writes model.pkl + the individual model files
+python app.py        # starts the Flask dev server on http://127.0.0.1:5000, creates url_blacklist.db
+```
+
+`app.run(debug=True)` is the app's actual startup call in `app.py` - fine for local development, but Flask's debugger (enabled by `debug=True`) allows arbitrary code execution through its interactive traceback page if the app is ever exposed on a network reachable by anyone other than the developer, so this should be turned off (or run behind a production WSGI server with debug disabled) before deploying anywhere beyond a local machine.
+
+## Top-level structure
+
+| Path | Purpose |
+| --- | --- |
+| `app.py` | Flask app - the three routes |
+| `predictor.py` | Loads `model.pkl`, checks the blacklist, calls `featuresExt`, returns a verdict |
+| `featuresExt.py` | The 22-feature extraction pipeline - see `04-feature-extraction.mdx` |
+| `database.py` | The `Blacklist` SQLAlchemy model, `init_db`/`add_url`/`search_url` |
+| `model.py` | Standalone training script - reads `dataset.csv`, trains/tunes 3 models, writes all four `.pkl` files and the `diagrams/` charts |
+| `visual.py` | Standalone exploratory-data-analysis script - also reads `dataset.csv`, writes more charts to `diagrams/` |
+| `dataset.csv` | 11,430 labeled URLs with the same 22 pre-computed feature columns `featuresExt.py` produces live |
+| `processed_dataset.csv` | An alternate version of the dataset with a few renamed/duplicated columns - not read by any script in this repo |
+| `model.pkl`, `random_forest_model.pkl`, `xgboost_model.pkl`, `decision_tree_model.pkl` | Pre-trained model files already committed to the repo; only `model.pkl` is loaded by the live app |
+| `instance/url_blacklist.db` | The SQLite blacklist database, already populated in this checkout |
+| `templates/` | `index.html`, `check.html`, `results.html` - see `02-web-app-and-routes.mdx` |

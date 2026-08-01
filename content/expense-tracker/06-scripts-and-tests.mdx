@@ -1,0 +1,30 @@
+---
+title: Scripts & Tests
+order: 6
+---
+
+Everything in this section lives at the project root (not under `backend/`) and is meant to be run manually via `python <script>.py` - none of it is imported by the FastAPI app itself.
+
+## Database setup scripts
+
+- **`init_db.py`** - creates all tables (`Base.metadata.create_all`) and, if no categories exist yet, seeds a small starter set: Food, Rent, Salary, Utilities, Freelance (5 categories total).
+- **`add_default_categories.py`** - a separate, more thorough category seeder: 13 expense categories and 5 income categories (e.g. "Food & Dining," "Bills & Utilities," "Personal Care"), also skipping seeding if any category already exists. This and `init_db.py`'s built-in seeding logic overlap in purpose but produce different category sets - running `init_db.py` first would seed the smaller 5-category set and make `add_default_categories.py`'s later run a no-op (since it only seeds if the categories table is completely empty).
+- **`add_sample_data.py`** - adds 100 random expense transactions (spread over the last 180 days), 6 months of $3,000 salary income transactions, and budgets for the first 6 expense categories (random limits between $200-500). Requires categories to already exist.
+- **`generate_ml_data.py`** - purpose-built to give the ML forecasting endpoints something with a visible trend to detect: generates 20-30 expense transactions per month going back `months_back` (default 12) months, with amounts scaled by a `trend_multiplier` that increases 2% per month - i.e. deliberately synthetic upward-trending data, not meant to resemble realistic spending patterns so much as to exercise `ml_predictions.py`'s regression and seasonality logic with data that has an actual trend in it.
+- **`reset_db.py`** - drops all tables (`Base.metadata.drop_all`) after an interactive `y`/`yes` confirmation prompt. Its print statements still say "Connecting to MySQL" - leftover text from before the project's move to Postgres (see `01-overview.mdx`).
+
+## Test scripts - not actually `pytest`
+
+All six `test_*.py` files (`test_analytics.py`, `test_budget_alerts.py`, `test_connection.py`, `test_crud.py`, `test_database.py`, `test_ml_predictions.py`) are plain scripts with a `run_test()`-style function called under `if __name__ == "__main__":` - **none of them use `pytest` or a single `assert` statement**, despite the `test_` filename prefix that would normally make `pytest`/`unittest` auto-discover them. Each one prints what it's doing and the values it gets back, meant to be read by a person running it manually rather than asserted against automatically in CI. A few specifics:
+
+- **`test_connection.py`** - tests a raw `pymysql` connection directly against `DB_HOST`/`DB_USER`/`DB_PASSWORD`/`DB_NAME` env vars - this is a MySQL-specific connectivity check left over from before the Postgres migration (see `01-overview.mdx`), and would fail outright against the project's current Postgres setup since it doesn't even attempt a Postgres connection.
+- **`test_database.py`** - imports `DATABASE_URL` from `backend/database.py` and prints it directly (`print(f"Database URL: {DATABASE_URL}")`). If run with real production credentials in `.env`, this would print the full connection string - including the database password - to the terminal/log output. Low-severity for a script that's meant to be run locally by hand, but worth knowing if this script (or its output) is ever run somewhere logs get captured or shared.
+- **`test_crud.py`**, **`test_analytics.py`**, **`test_budget_alerts.py`**, **`test_ml_predictions.py`** - each exercises one module's functions against whatever's currently in the connected database (creating a category/transaction if needed first), printing results with checkmark-style status messages for a human to skim.
+
+## `test_charts.html`
+
+A static HTML page (plain `<style>` + vanilla JS, no framework) meant to be opened directly in a browser during development: it `fetch()`es each `/visualizations/*` endpoint from a hardcoded `http://localhost:8000` (or similar) base URL, decodes the returned base64 PNG, and displays all six charts in a grid - including the three stub charts from `05-visualizations-and-exports.mdx`, which would show their "coming soon" placeholder text right alongside the three real ones. This file isn't served by the FastAPI app (there's no static-file mount in `main.py`) - it's a standalone developer tool, opened locally rather than deployed.
+
+## `gitcommit.py`
+
+Not a project script at all in the usual sense - a tiny personal workflow shortcut that stages every change, commits with a **hardcoded** message (`"removing seeding logic 3"` in the current version), and pushes, all in one `python gitcommit.py` run. Running it as-is would commit under that exact literal message regardless of what actually changed, so it's really only usable by editing the `message` variable before each run.

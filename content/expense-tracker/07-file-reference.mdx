@@ -1,0 +1,30 @@
+---
+title: File Reference
+order: 7
+---
+
+| File | Purpose | Imports from | Imported by |
+| --- | --- | --- | --- |
+| `backend/main.py` | FastAPI app, all routes, all Pydantic models | `backend.database`, `backend.crud`, `backend.models`, `backend.analytics`, `backend.visualizations`, `backend.exports`, `backend.ml_predictions` | Run via `uvicorn backend.main:app` (`Procfile`) |
+| `backend/database.py` | `DATABASE_URL` resolution, SQLAlchemy `engine`/`SessionLocal`/`Base`, `get_db()` | `sqlalchemy`, `dotenv` | `backend/models.py`, `backend/main.py`, every root-level script |
+| `backend/models.py` | `Category`, `Transaction`, `Budget`, `TransactionType` enum | `backend.database` | `backend/crud.py`, `backend/main.py`, `backend/analytics.py`, `backend/ml_predictions.py`, `backend/exports.py` |
+| `backend/crud.py` | Direct DB reads/writes, keyed by ID; `get_spending_by_category`, `get_total_income_expense`, `get_budget_vs_actual` | `backend.models` | `backend/main.py`, `backend/exports.py` |
+| `backend/analytics.py` | `pandas`-based aggregation, budget alerts, simple average predictor | `backend.models`, `pandas` | `backend/main.py`, `backend/visualizations.py` |
+| `backend/ml_predictions.py` | `scikit-learn` linear regression forecasting | `backend.models`, `sklearn`, `pandas` | `backend/main.py` |
+| `backend/visualizations.py` | matplotlib chart generation (3 real, 3 stubs) | `backend.analytics`, `matplotlib`, `pandas` | `backend/main.py` |
+| `backend/exports.py` | CSV generation | `backend.models`, `backend.crud` (imported locally inside `export_summary_csv`) | `backend/main.py` |
+| `init_db.py` | Create tables + seed 5 starter categories | `backend.database`, `backend.models`, `backend.crud` | Run manually |
+| `reset_db.py` | Drop all tables (with confirmation prompt) | `backend.database`, `backend.models` | Run manually |
+| `add_default_categories.py` | Seed 18 categories (overlaps with `init_db.py`'s seeding) | `backend.database`, `backend.models` | Run manually |
+| `add_sample_data.py` | Seed 100 random transactions + budgets | `backend.database`, `backend.crud`, `backend.models` | Run manually |
+| `generate_ml_data.py` | Seed synthetic trending data for ML testing | `backend.database`, `backend.crud`, `backend.models` | Run manually |
+| `test_analytics.py`, `test_budget_alerts.py`, `test_connection.py`, `test_crud.py`, `test_database.py`, `test_ml_predictions.py` | Manual, print-based smoke-test scripts (no `pytest`/`assert`) | Varies per file - see `06-scripts-and-tests.mdx` | Run manually |
+| `test_charts.html` | Standalone dev page fetching `/visualizations/*` and rendering all six charts | - | Opened directly in a browser, not served by the app |
+| `gitcommit.py` | Personal git stage/commit/push shortcut with a hardcoded commit message | `subprocess` | Run manually, unrelated to the app itself |
+
+## Things worth double-checking
+
+- `render.yaml`'s `startCommand` (`uvicorn main:app`) disagrees with `Procfile`'s (`uvicorn backend.main:app`) - see `01-overview.mdx`.
+- `PyMySQL` in `requirements.txt` and `test_connection.py`'s MySQL-specific connectivity check both appear to be leftovers from before this project's move to Postgres/Supabase.
+- There's no `PUT /budgets/{id}` route despite `crud.update_budget` being fully implemented - see `03-api-reference.mdx`.
+- Three of the six `/visualizations/*` endpoints (`budget-comparison`, `income-expense`, `category-trend`) return a placeholder "coming soon" chart rather than real data - see `05-visualizations-and-exports.mdx`.

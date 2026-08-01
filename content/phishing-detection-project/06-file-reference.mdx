@@ -1,0 +1,29 @@
+---
+title: File Reference
+order: 6
+---
+
+| File | Purpose | Imports from | Imported by |
+| --- | --- | --- | --- |
+| `app.py` | Flask app, all 3 routes | `predictor`, `database` | Run via `python app.py` |
+| `predictor.py` | Loads `model.pkl`, blacklist check, `classifyURL` | `featuresExt`, `database`, `pickle` | `app.py` |
+| `featuresExt.py` | The 22-feature extraction pipeline | `whois`, `bs4`, `requests` | `predictor.py` |
+| `database.py` | `Blacklist` model, `init_db`/`add_url`/`search_url` | `flask_sqlalchemy` | `app.py`, `predictor.py` |
+| `model.py` | Trains/tunes Random Forest, XGBoost, Decision Tree; picks the best as `model.pkl` | `sklearn`, `xgboost`, `pandas`, `matplotlib`, `seaborn` | Run standalone (`python model.py`), not imported by the app |
+| `visual.py` | Exploratory data analysis charts, independent of `model.py` | `pandas`, `matplotlib`, `seaborn` | Run standalone (`python visual.py`) |
+| `dataset.csv` | 11,430 labeled URLs, 22 feature columns plus `url` and `status` | - | `model.py`, `visual.py` |
+| `processed_dataset.csv` | Alternate dataset version with renamed/extra columns | - | Not read by any script in this repo |
+| `model.pkl` | The model `predictor.py` actually loads at runtime - whichever of the 3 trained models scored highest test accuracy | - | `predictor.py` |
+| `random_forest_model.pkl`, `xgboost_model.pkl`, `decision_tree_model.pkl` | The individually-saved versions of each of the 3 trained models | - | Not loaded by the live app - available for manual inspection/comparison only |
+| `instance/url_blacklist.db` | SQLite blacklist database (already populated in this checkout) | - | `database.py` via Flask-SQLAlchemy |
+| `templates/index.html` | Landing page | - | `app.py`'s `/` route |
+| `templates/check.html` | URL submission form; references a missing `styles.css` | - | `app.py`'s `/catch_phish` route |
+| `templates/results.html` | Verdict display | - | `app.py`'s `/results` route |
+
+## Corrections and gaps worth double-checking
+
+- `requirements.txt` is referenced by the README but doesn't exist in this repo - see `01-overview.mdx` for the inferred dependency list.
+- The README calls the blacklist file `phishing.db`; the actual file/config name is `url_blacklist.db`.
+- The README describes training as producing an XGBoost model specifically; `model.py` actually trains and compares three model types and saves whichever wins on test accuracy as `model.pkl` - see `05-model-training.mdx`.
+- `web_traffic` (`featuresExt.py`) calls Alexa's discontinued ranking API and will always return `0` today - see `04-feature-extraction.mdx`.
+- `check.html` references a `styles.css` file that doesn't exist anywhere in the project (no `static/` folder at all) - harmless since the page's real styling is inline, but worth cleaning up.

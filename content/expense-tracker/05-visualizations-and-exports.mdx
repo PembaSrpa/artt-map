@@ -1,0 +1,30 @@
+---
+title: Visualizations & Exports
+order: 5
+---
+
+## Chart generation (`backend/visualizations.py`)
+
+Every chart function builds a `matplotlib` figure and returns it as a base64-encoded PNG via a shared `generate_chart_base64` helper (renders to an in-memory `BytesIO` buffer at 100 DPI, `bbox_inches='tight'`, then explicitly `plt.close(fig)` to free the figure - important in a server process handling repeated requests, since matplotlib figures aren't garbage-collected automatically the way most Python objects are). `matplotlib.use('Agg')` is set at module import time, the standard non-interactive backend needed to render charts without a display in a server environment.
+
+**Three of the six chart functions are fully implemented:**
+
+- `create_monthly_trend_chart` - filled line chart of monthly expense totals (reuses `analytics.get_monthly_spending_trend`)
+- `create_category_pie_chart` - pie chart of top-N expense categories (reuses `analytics.get_top_spending_categories`)
+- `create_spending_patterns_chart` - bar chart of total spending by day of week (reuses `analytics.get_spending_patterns`)
+
+**The other three are placeholder stubs** that don't query the database or plot any real data at all:
+
+- `create_budget_comparison_chart` - always renders a blank chart with the text "Budget comparison chart coming soon," regardless of what budget/spending data actually exists
+- `create_income_expense_chart` - always renders "Income vs Expense chart coming soon"
+- `create_category_trend_chart` - sets a title (`f'Trend for {category_name}'`) but never plots any data - an empty chart with just a heading
+
+All three still respond successfully (`200 OK` with a valid base64 PNG) via their corresponding `/visualizations/*` endpoints - a caller has no way to distinguish "no data exists yet" from "this chart was never finished" purely from the HTTP response; the placeholder text is the only signal, and only if the caller actually renders and looks at the image.
+
+## CSV exports (`backend/exports.py`)
+
+Three fully-implemented export functions, each building a CSV in memory with Python's standard `csv` module and returning the raw string (which `main.py`'s routes wrap in a `StreamingResponse` with a `Content-Disposition: attachment` header):
+
+- **`export_transactions_csv`** - one row per transaction, filterable by date range, ID/date/amount/category/description/type/created-at columns.
+- **`export_budgets_csv`** - one row per budget with its category name, limit, start date, created-at.
+- **`export_summary_csv`** - a hand-formatted report rather than a flat table: a header block (period, total income/expenses/net), a blank row, then a category-by-category breakdown with each category's percentage share of total expenses. This is the only export that isn't a simple "one row per database row" dump - it composes data from two different `crud.py` functions (`get_spending_by_category`, `get_total_income_expense`) into a single readable document.
