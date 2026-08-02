@@ -1,0 +1,39 @@
+---
+title: Guessing Game
+order: 3
+---
+
+`CharacterGuessingGame` (`app/models/guessing_game.py`) is an Akinator-style 20-questions game: the person thinks of a character, the server asks a fixed sequence of up to 7 questions, and each answer narrows a candidate pool until either one candidate remains or the question tree runs out.
+
+## The question tree
+
+A hardcoded list of 7 questions (`_build_question_tree`), each with a `field` (the `Character` column or nested `additional_info` key it filters on), a `type` (`exact`/`nested`/`contains`/`range`), a set of `options`, and an optional `condition` gating whether the question applies at all:
+
+1. Anime or actor? (`type`, exact)
+2. Gender (`additional_info.gender`, nested)
+3. Hero/villain/anti-hero (`alignment`, exact) - **only asked if `type == "anime"`**
+4. A dominant trait (`traits`, contains-match against a list column)
+5. Genre of their main work (`genres`, contains-match)
+6. Special powers/abilities (`traits`, contains-match) - **only asked if `type == "anime"`**
+7. Fame level (`popularity_score`, range-match against fixed numeric buckets)
+
+## Answering a question and narrowing the pool
+
+`answer_question` filters the current `candidate_ids` list against the just-answered question via `_filter_candidates`, matching each remaining `Character` row by the question's `type`:
+
+- **`exact`** - the column's value equals the answer
+- **`nested`** - specifically handles `additional_info.gender` by reading that key out of the JSON `additional_info` column
+- **`contains`** - the answer appears in a list-typed column (`traits`/`genres`)
+- **`range`** - the character's `popularity_score` falls within the numeric range associated with the chosen option label
+
+If a question's filter would eliminate every remaining candidate, `_filter_candidates` **falls back to returning the input list unchanged** rather than an empty result - a deliberate guard against ending the game in a dead end from one bad/ambiguous answer, at the cost of that answer having no effect on the candidate pool at all.
+
+After filtering, the game either makes a guess (if 1 or 0 candidates remain, or the question tree is exhausted) or advances to the next applicable question - skipping over any question whose `condition` doesn't match, checked via `_check_condition` against **a single sample candidate** (`candidate_ids[0]`), not the whole remaining pool. In practice this is safe as long as the type-defining first question has already run (so every remaining candidate genuinely shares that `type` value), but it's technically checking one representative rather than verifying the condition holds for every remaining candidate.
+
+## Making a guess
+
+`_make_guess` returns the top 3 remaining candidates by `popularity_score`. Every one of those 3 gets the **same** `confidence` value from `_calculate_confidence`, which is a function of only how many candidates were remaining overall (95% for 1 candidate, 80% for 2, 65% for 3, 50% for up to 5, 35% otherwise) - the three returned guesses aren't individually ranked by how well each one fits the answers given, only jointly by "how narrowed-down was the pool when we stopped."
+
+## The game is stateless on the server - and `GameSession` is unused
+
+`start_game` generates a `session_id` (a UUID) but never stores it, and no `GameSession` row is ever created or updated anywhere in this file or in `app/routes/guessing.py` - despite `GameSession` (with `answers`, `remaining_candidates`, `was_correct`, etc.) being fully defined as a table in `app/database/models.py`. All actual game state (`question_number`, `candidate_ids`) is round-tripped through the client on every `POST /api/game/answer` call (`GameAnswerRequest` requires the caller to send both back each time) rather than being looked up server-side by `session_id`. This means `session_id` today functions only as an opaque identifier for the frontend/logs, not as a real lookup key into any stored session - and, like `PredictionLog` in the sibling `DriveTime` project documented elsewhere in this project set, `GameSession` is a fully-modeled table with no code path that ever writes to it.

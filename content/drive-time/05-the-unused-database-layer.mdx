@@ -1,0 +1,26 @@
+---
+title: The Unused Database Layer
+order: 5
+---
+
+Everything on this page is real, working code - it just isn't reachable from the live application anymore.
+
+## What's still here
+
+- **`app/database.py`** - a standard SQLAlchemy `engine`/`SessionLocal`/`Base` setup, reading `DATABASE_URL` from the environment with `create_engine(DATABASE_URL)` called unconditionally (no check for whether `DATABASE_URL` is actually set - if it's `None`, this raises immediately rather than failing with a clearer message).
+- **`app/models.py`** - two tables: `TripData` (for storing historical trips to retrain against) and `PredictionLog` (for recording every prediction the API makes, presumably for later monitoring/retraining).
+- **`create_tables.py`** - a one-off script that calls `Base.metadata.create_all`.
+- **`seed_database.py`** - loads `data/sample_data.csv` into the `trip_data` table, with an interactive confirmation prompt if the table already has rows.
+- **`railway_setup.py`** - meant to run as a Railway "release phase" step (see `Procfile`): checks for `DATABASE_URL`, creates tables, and seeds from the CSV if the table's empty.
+
+## Why none of it runs today
+
+`app/main.py` - the actual FastAPI app - imports only `app.schemas` and `app.ml.predict`. It never imports `app.database` or `app.models`, and its `/health` route has a comment explicitly stating the database check was removed "to prevent crashes after Supabase deletion." Combined with the app's own title (`"Stateless ML-Powered Vehicle Travel Time Estimator"`) and version bump to `1.1.0`, this reads as a deliberate architectural change: DriveTime was originally built to log every prediction and store trip history in Postgres (via Supabase), and at some point that database was taken down, so the app was changed to run without it rather than trying to keep a database dependency that no longer exists.
+
+## A deployment risk worth checking
+
+`Procfile` still declares `release: python railway_setup.py`, and `railway_setup.py` calls `sys.exit(1)` if `DATABASE_URL` isn't set in the environment. On Railway (and similar platforms that use a release-phase step), **a failing release command blocks the subsequent web process from starting.** If `DATABASE_URL` was removed from this project's Railway environment variables at the same time the Supabase database was deleted, the next deploy attempt would fail at the release step before the actual API (`web: uvicorn app.main:app ...`) ever got a chance to start - even though the API itself no longer needs a database at all. This isn't something that can be confirmed from the code alone (it depends on whatever environment variables are currently configured on the live Railway project), but it's a concrete risk worth checking directly in the deployment settings: either `DATABASE_URL` is still set to something (even a now-dead connection string, which would satisfy the check without the app using it) or `Procfile`'s `release` line should be removed now that the app doesn't depend on it.
+
+## Nothing currently repopulates `PredictionLog`
+
+Even setting the deployment-risk question aside, nothing in the live request path (`main.py`'s `/predict` handler) writes to `PredictionLog` even when a database connection is available - that table's write path only ever existed implicitly (there's no code anywhere, in any file, that actually inserts a row into `prediction_logs`). The table is defined but was seemingly never wired up to log predictions in the first place, independent of the later Supabase removal.

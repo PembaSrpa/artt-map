@@ -1,0 +1,38 @@
+---
+title: Broken Setup & Seed Scripts
+order: 5
+---
+
+Beyond the two broken live API routes documented in `04-api-routes.mdx`, several of the offline scripts used to set up and populate the database also have concrete, directly-verified bugs. None of these affect the running API directly (they're all standalone `python <script>.py` runs), but they mean the documented/implied setup path - create tables, then seed movies/books/characters - doesn't currently work end-to-end as written.
+
+## `init_db` is never defined
+
+Both `init_database.py` (`from app.database.db import init_db, engine`) and `seed_production_db.py` (`from app.database.db import SessionLocal, init_db`) import and call a function named `init_db` from `app/database/db.py`. That module only defines `engine`, `SessionLocal`, `Base`, and `get_db` - there is no `init_db` function anywhere in this codebase. Running either script fails immediately with an `ImportError`, before either script does anything else (including `seed_production_db.py`'s movie/book/character seeding, which never gets a chance to run). The clear intent, based on how both scripts use it, is a one-line function equivalent to `Base.metadata.create_all(bind=engine)` - `create_tables.py` (a separate script) does call `Base.metadata.create_all` directly and would work on its own, but it's not what either of the two scripts above actually calls.
+
+## `fetch_diverse_collection` is never defined
+
+`seed_production_db.py`'s `seed_books()` and the standalone `fetch_and_save_books.py` both call `GoogleBooksService.fetch_diverse_collection(books_per_genre=...)`. `GoogleBooksService` (`app/services/books_service.py`) only defines `fetch_books_by_genre` and `fetch_1k_books` - no `fetch_diverse_collection` method exists. Both call sites would fail with an `AttributeError` the moment book-fetching is attempted (even if the `init_db` issue above were fixed first).
+
+## `get_movie_stats`/`get_book_stats` return less than callers expect
+
+`fetch_and_save_movies.py` prints `stats['average_rating']` and iterates `stats['decades'].items()` after calling `crud.get_movie_stats(db)` - but that function only returns `{'total_movies': ...}`. `fetch_and_save_books.py` has the identical pattern with `get_book_stats` (also only returns `{'total_books': ...}`). Both scripts would successfully fetch and save data first (the save step doesn't touch these functions), then crash with a `KeyError` at their final "show statistics" step - so a run looks successful (movies/books really do get saved) right up until the last few lines of console output.
+
+## Movie posters are fetched but never saved (`poster_path` vs `poster_url`)
+
+`TMDBService._process_movie_data` (`app/services/tmdb_service.py`) computes a `poster_url` column (`f"{IMAGE_BASE_URL}{poster_path}"`) and keeps it in the DataFrame it returns - but doesn't keep the original `poster_path` column (it's not in `columns_to_keep`). `crud.save_movies_bulk` reads `row.get('poster_path')` to populate the `Movie.poster_path` database column - a key that no longer exists in the DataFrame at that point, so `.get()` always returns `None`. The same function also reads `row.get('original_language')`, which was likewise dropped from `columns_to_keep`. Net effect: every movie saved through this pipeline gets `poster_path = None` and `original_language = None` in the database, regardless of what TMDB actually returned - poster images silently never make it into storage.
+
+## Book fields use the wrong casing for Google Books' actual API response
+
+`GoogleBooksService._process_book_data` reads `vol.get('page_count', 0)`, `vol.get('average_rating', 0)`, and `vol.get('ratings_count', 0)` from each Google Books API volume - but the Google Books API's actual JSON fields for these are camelCase (`pageCount`, `averageRating`, `ratingsCount`), matching the camelCase convention the same function correctly uses elsewhere (`publishedDate`, `imageLinks`). Because the snake_case keys this function looks for don't exist in the real API response, `.get(..., 0)` always falls through to its default of `0` - every book saved through this pipeline has `page_count`, `average_rating`, and `ratings_count` permanently zeroed out, even though the same information is present (under different key names) in the data this function already has in hand.
+
+## `view_movies.py` is also broken
+
+`view_movies.py` (a small standalone script for eyeballing what's in the database) does `from app.database.crud import get_all_movies, get_movies_by_genre` at module level - the same missing function behind the broken `GET /api/movies` route (see `04-api-routes.mdx`). Running `python view_movies.py` fails immediately with an `ImportError`, before it prints anything.
+
+## Test scripts are manual, not `pytest`
+
+The 5 `test_*.py` files (`test_api.py`, `test_db.py`, `test_guessing_game.py`, `test_recommendations.py`, `test_similarity.py`) sit at the project root rather than under a `tests/` directory. None of them import `pytest` or use a single `assert` statement, despite `pytest`/`pytest-asyncio` being listed in `requirements.txt` - each is a plain script with a `main()`/scenario function that prints formatted output for a person to read, called under `if __name__ == "__main__":`. `test_recommendations.py` and `test_similarity.py` exercise `RecommendationEngine` directly against whatever's in the connected database; `test_guessing_game.py` runs a scripted simulation of `CharacterGuessingGame`; `test_api.py` sends live HTTP requests to `http://localhost:8001` (a hardcoded port - the app itself must already be running separately for this one to do anything); `test_db.py` is a minimal raw-connection check, printing `DATABASE_URL` directly to the console in the process (see the note on `.env.example` in `01-overview.mdx` for the general caution around printing connection strings). None of these five scripts touch `GET /api/movies`, `GET /api/books`, or any of the broken setup scripts described above, which is consistent with why those bugs are still present - nothing in this repo currently exercises those code paths.
+
+## Other scripts, not individually verified for this class of bug
+
+`expand_data.py`, `fix_books.py`, `tag_characters.py`, `seed_characters.py`, `fetch_actors.py`, and `fetch_anime_characters.py` are additional standalone utility scripts present in the repo (see `06-file-reference.mdx` for a one-line purpose each) that weren't individually checked line-by-line for the same class of missing-function/field-name bugs documented above - the issues on this page are limited to what was directly traced through `init_database.py`, `seed_production_db.py`, `fetch_and_save_movies.py`, `fetch_and_save_books.py`, and `view_movies.py`. `expand_data.py`, notably, calls `save_movies_bulk`/`save_books_bulk` (both of which exist and work) but likely inherits the same `poster_path`/Google-Books-field-casing issues described above, since it goes through the same `TMDBService`/`GoogleBooksService` code.

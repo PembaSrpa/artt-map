@@ -1,0 +1,44 @@
+---
+title: File Reference
+order: 6
+---
+
+| File | Purpose | Imports from | Imported by |
+| --- | --- | --- | --- |
+| `app/main.py` | FastAPI app, CORS, `/`, `/health` | `app.database.db`, `app.database.models`, `app.routes.*`, `app.schemas` | Run via `uvicorn app.main:app` (`railway.toml`) |
+| `app/schemas.py` | All Pydantic request/response models | - | `app/main.py`, both route files |
+| `app/database/db.py` | Engine/session setup, `get_db()`, an unused second `Base` | `sqlalchemy`, `dotenv` | `app/main.py`, `app/routes/*`, `app/database/crud.py`, most root-level scripts |
+| `app/database/models.py` | `Movie`, `Book`, `Character`, `GameSession` (the `Base` actually used) | - | `app/database/crud.py`, `app/models/*.py`, `app/main.py`, most root-level scripts |
+| `app/database/crud.py` | `save_movies_bulk`, `save_books_bulk`, `get_movie_stats`, `get_book_stats`, `get_all_movies`, `get_all_books` - notably missing `get_movies_by_genre`/`get_books_by_category` | `app.database.models`, `pandas` | `app/routes/recommendations.py` (2 broken imports), `app/models/recommendations.py`, several root scripts |
+| `app/models/recommendations.py` | `RecommendationEngine` - hand-written weighted scoring, movie-only | `app.database.models`, `app.database.crud`, `pandas` | `app/routes/recommendations.py` |
+| `app/models/guessing_game.py` | `CharacterGuessingGame` - the 7-question decision tree | `app.database.models` | `app/routes/guessing.py` |
+| `app/routes/recommendations.py` | `/api/recommendations`, `/api/movies/{id}/similar`, `/api/trending/movies`, `/api/movies` (broken), `/api/books` (broken) | `app.database.db`, `app.schemas`, `app.models.recommendations` | `app/main.py` |
+| `app/routes/guessing.py` | `/api/game/start`, `/api/game/answer`, `/api/game/characters` | `app.database.db`, `app.schemas`, `app.models.guessing_game` | `app/main.py` |
+| `app/services/tmdb_service.py` | `TMDBService` - TMDB API client, movie data shaping (drops `poster_path`/`original_language`) | `requests`, `pandas` | `fetch_and_save_movies.py`, `seed_production_db.py`, `expand_data.py`, `fetch_actors.py` |
+| `app/services/books_service.py` | `GoogleBooksService` - Google Books API client (missing `fetch_diverse_collection`; wrong-cased field lookups) | `requests`, `pandas` | `fetch_and_save_books.py`, `seed_production_db.py`, `fix_books.py`, `expand_data.py` |
+| `init_database.py` | Create tables - **broken**, imports nonexistent `init_db` | `app.database.db` | Run manually |
+| `create_tables.py` | Create tables via `Base.metadata.create_all` directly - works | - | Run manually |
+| `seed_production_db.py` | Seed movies/books/characters for production - **broken**, imports nonexistent `init_db` and `fetch_diverse_collection` | `app.services.*`, `app.database.*` | Run manually |
+| `fetch_and_save_movies.py` | Fetch + save movies - saves successfully, then **crashes** printing stats | `app.services.tmdb_service`, `app.database.*` | Run manually |
+| `fetch_and_save_books.py` | Fetch + save books - **broken**, calls nonexistent `fetch_diverse_collection` | `app.services.books_service`, `app.database.*` | Run manually |
+| `view_movies.py` | Print top movies from the DB - **broken**, imports nonexistent `get_movies_by_genre` | `app.database.db`, `app.database.crud` | Run manually |
+| `expand_data.py` | Expand movie/book collections toward 1,000 items each | `app.services.*`, `app.database.*` | Run manually - not individually verified, see `05-broken-setup-and-seed-scripts.mdx` |
+| `fix_books.py` | Re-fetch/repair book data | `app.services.books_service`, `app.database.*` | Run manually - not individually verified |
+| `fetch_actors.py` | Fetch popular actors from TMDB into a JSON file | `app.services.tmdb_service` | Run manually - feeds `data/actors_raw.json` |
+| `fetch_anime_characters.py` | Fetch anime characters from the Jikan API into a JSON file | `requests` | Run manually - feeds `data/anime_characters_raw.json` |
+| `tag_characters.py` | Interactive CLI tool to hand-tag raw actor/anime data with game attributes | - | Run manually - produces tagged character data consumed by `seed_characters.py`/`seed_production_db.py` |
+| `seed_characters.py` | Load `data/characters_seed.json` into the `characters` table | `app.database.db`, `app.database.models` | Run manually |
+| `test_api.py` | Manual HTTP smoke test against a running local server (`localhost:8001`) | `requests` | Run manually |
+| `test_db.py` | Minimal raw DB connectivity check; prints `DATABASE_URL` to console | `sqlalchemy`, `dotenv` | Run manually |
+| `test_guessing_game.py` | Scripted simulation of a full guessing-game playthrough | `app.database.db`, `app.models.guessing_game` | Run manually |
+| `test_recommendations.py` | Exercises `RecommendationEngine.recommend_movies` against a few scenarios | `app.database.db`, `app.models.recommendations` | Run manually |
+| `test_similarity.py` | Exercises `RecommendationEngine.get_similar_movies` | `app.database.db`, `app.models.recommendations`, `app.database.crud` | Run manually |
+
+## Everything flagged across these pages, in one place
+
+- `GET /api/movies` and `GET /api/books` - the two broken live API routes - see `01-overview.mdx` and `04-api-routes.mdx`.
+- `init_database.py`, `seed_production_db.py`, `fetch_and_save_books.py`, and `view_movies.py` all fail immediately on missing functions; `fetch_and_save_movies.py`/`fetch_and_save_books.py` fail only at their final stats-printing step - see `05-broken-setup-and-seed-scripts.mdx`.
+- Movie posters and `original_language`, plus book `page_count`/`average_rating`/`ratings_count`, are silently never saved correctly due to field-name mismatches - see `05-broken-setup-and-seed-scripts.mdx`.
+- Two independent `declarative_base()` instances exist; only one is actually used - see `01-overview.mdx`.
+- `.env.example`'s `TMDB_API_KEY` looks like a real key rather than a placeholder - see `01-overview.mdx`.
+- `scikit-learn`, `scipy`, and `alembic` are listed dependencies with no corresponding code in this repository.

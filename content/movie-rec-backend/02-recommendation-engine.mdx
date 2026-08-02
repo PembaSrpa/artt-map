@@ -1,0 +1,41 @@
+---
+title: Recommendation Engine
+order: 2
+---
+
+`RecommendationEngine` (`app/models/recommendations.py`) is entirely hand-written weighted scoring over columns already in Postgres - no vectorization, no embeddings, no `scikit-learn` despite it being a listed dependency (see `01-overview.mdx`).
+
+## `recommend_movies` - preference-based scoring
+
+Loads up to 1,000 movies from the database into a `pandas` `DataFrame`, then scores every one of them against the request's preferences via `_calculate_movie_score`, a fixed weighted sum out of 10 points:
+
+| Factor | Weight | How it's scored |
+| --- | --- | --- |
+| Genre match | 40% (4.0 pts) | Fraction of requested genres present in the movie's genre list; 2.0 (neutral) if no genres requested |
+| Decade match | 15% (1.5 pts) | 1.5 for an exact decade match, 0.75 for an adjacent decade, 0.75 (neutral) if no decade requested |
+| Mood match | 20% (2.0 pts) | Fraction of a fixed mood-to-genre mapping (e.g. `"intense"` maps to Action/Thriller/Horror/War) present in the movie's genres |
+| Setting match | 10% (1.0 pt) | Same pattern, against a setting-to-genre mapping (`"futuristic"` -> Science Fiction/Fantasy, etc.) |
+| Quality (rating) | 15% (1.5 pts) | `vote_average / 10 * 1.5` - always applied regardless of what else was requested |
+
+Results are sorted by score, optionally filtered by `min_rating` first, then truncated to `top_n`. `match_quality` (`"high"`/`"medium"`/`"low"`/`"none"`) is derived from the *average* score of the returned top-N, not any single item's score, and is purely informational - it doesn't change which items get returned. `_get_match_reason` builds a human-readable `match_reason` string per result by re-checking which specific preferences that item satisfied (genre/decade/mood/high-rating/popularity), independently of the scoring math that already ran.
+
+`get_fallback_recommendations` (highly-rated, popular movies with no preference filtering) exists as a separate method but isn't automatically triggered by `recommend_movies` on a low-match-quality result - it would need to be called explicitly by a caller as a fallback path.
+
+## `get_similar_movies` - item-to-item similarity
+
+Given a `movie_id`, loads **every other movie in the table** and computes `_calculate_similarity` against each one - an O(n) full-table comparison on every request, not a precomputed or cached similarity matrix. The similarity score (0-10) is also a fixed weighted sum:
+
+- **Genre overlap (50%)** - Jaccard similarity (`|intersection| / |union|`) between the two movies' genre sets, scaled to 5.0
+- **Decade proximity (20%)** - 2.0 for the same decade, 1.0 for an adjacent decade, 0.5 for two decades apart, 0 beyond that
+- **Rating similarity (20%)** - `max(0, (10 - |rating_diff|) / 10) * 2.0`
+- **Popularity proximity (10%)** - the ratio of the smaller popularity value to the larger, scaled to 1.0
+
+Results are sorted descending by this score and truncated to `top_n`. `_get_similarity_reason` (like `_get_match_reason` above) independently re-derives a human-readable explanation rather than reusing intermediate values from the scoring calculation.
+
+## `get_trending_recommendations`
+
+Not shown in full here, but follows the same pattern as the rest of the engine: a straightforward database query sorted by `popularity`, formatted into the same response shape as the other recommendation methods.
+
+## No book-specific scoring engine
+
+`RecommendationEngine` imports `Book` (`from app.database.models import Movie, Book`) but every method actually implemented (`recommend_movies`, `get_similar_movies`, `get_trending_recommendations`, `_calculate_movie_score`, `_calculate_similarity`) operates on `Movie` only - there's no `recommend_books`/`get_similar_books` method anywhere in this file. `GET /api/books` (see `04-api-routes.mdx`) exists as a simple list endpoint independent of this engine, but there's no book-equivalent of `POST /api/recommendations`'s preference-based scoring.

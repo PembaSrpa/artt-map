@@ -1,0 +1,28 @@
+---
+title: Model Training & Data
+order: 4
+---
+
+Two separate, standalone synthetic-data generators exist in this repo, producing different-shaped data - only one of them produced the data actually used to train the committed model.
+
+## `generate_nepal_data.py` - the one that produced `data/sample_data.csv`
+
+Confirmed by directly inspecting `data/sample_data.csv`: its `vehicle_type` values (`microbus`, `motorcycle`, `car`, `jeep`, `scooter`, `truck`, `bus`) and `weather_condition` values (`fog`, `clear`, `rain`, `cloudy`, `dust` - no `snow`) match this generator's category lists exactly, and it includes a `road_type` column this generator populates from a hardcoded list of 18 real Nepal routes (Kathmandu-Pokhara, Kathmandu-Dharan, Pokhara-Sarangkot, etc.), each pre-tagged `highway`/`hill`/`city`/`terai`. `NUM_SAMPLES = 5000` (matching the CSV's row count), with `np.random.seed(42)`/`random.seed(42)` for reproducibility. Beyond the route/road-type pairing, it also builds in Nepal-specific realism: hill routes get a lower average speed range, certain routes have weighted-likely weather patterns, and traffic congestion is modeled as a function of the generated time-of-day.
+
+## `generate_data.py` - an earlier, generic (non-Nepal) generator
+
+Also `NUM_SAMPLES = 5000`, same random seeds, but with no route/city concept at all - `distance_km` is just `random.uniform(1, 500)`, and its category lists (`vehicle_types = ['car', 'truck', 'motorcycle', 'suv', 'van']`, `weather_conditions = ['clear', 'rain', 'fog', 'snow', 'cloudy']`) are the broader, non-Nepal-specific set that `schemas.py`'s validation was evidently modeled after - see `03-schema-vs-model-mismatch.mdx`. This script has no `road_type` concept whatsoever. It's not clear from the code itself whether this was an earlier draft later superseded by `generate_nepal_data.py`, or a still-intentionally-kept "generic" alternative - but it isn't what produced the currently-committed `data/sample_data.csv` or `models/*.pkl`.
+
+## `train.py`: fixed to 6 features regardless of which CSV is used
+
+Regardless of which generator's output is fed into it, `train.py`'s `feature_columns` list is hardcoded to the same 6 names (`distance_km`, `traffic_hours`, `vehicle_avg_speed`, and the three `_encoded` categorical columns) - it never reads or engineers anything from a `road_type` column even when one is present in the loaded CSV, and it never checks that the CSV actually has the columns it expects (a CSV missing one of the 6 expected columns would raise a `KeyError` from the `df[feature_columns]` selection, with no clearer error message).
+
+## Training procedure
+
+1. Load `data/sample_data.csv`, label-encode the 3 categorical columns with fresh `LabelEncoder`s fit on whatever's in that CSV (so the encoders' known classes are always exactly whatever categories happen to appear in the training data - see `03-schema-vs-model-mismatch.mdx` for what that means when the CSV's categories are narrower than the API schema's).
+2. 80/20 `train_test_split` (`random_state=42`).
+3. Fit a single `XGBRegressor` (`n_estimators=200`, `max_depth=6`, `learning_rate=0.1`, `subsample=0.8`, `colsample_bytree=0.8`) - no hyperparameter search, no cross-validation; these values are fixed constants in the script rather than tuned.
+4. Print MAE/RMSE/R-squared on both the train and test splits, plus 5 random sample predictions vs. actual values, for a person to read - none of these numbers are written to a file or asserted against a threshold.
+5. Save the fitted model, the fitted encoders, and the feature-name list to `models/`, overwriting whatever was there before.
+
+Because step 5 always overwrites the same three files, running `train.py` again with a different CSV (e.g. switching to `generate_data.py`'s output) would silently replace the committed Nepal-trained model - there's no versioning or side-by-side comparison between runs.

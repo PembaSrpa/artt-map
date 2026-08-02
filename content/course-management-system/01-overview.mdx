@@ -1,0 +1,65 @@
+---
+title: Overview
+order: 1
+---
+
+A straightforward full-stack CRUD app for a school/institute: an Express + MySQL backend exposing course/student/teacher/subject management, and a React (Vite) admin dashboard frontend. There's a login/register flow, but - as covered below - it doesn't actually gate anything on the server.
+
+## The two things most worth knowing before anything else
+
+**1. Every Subjects request uses the wrong URL casing and 404s.** The backend registers subject routes with a capital `S` (`/api/getSubject`, `/api/addSubject`, `/api/updateSubject/:id`, `/api/deleteSubject/:id`) - but every frontend call to a subject endpoint uses an all-lowercase path (`/api/getsubject`, `/api/addsubject`, `/api/updatesubject/:id`, `/api/deletesubject/:id`), both in the shared `AppContext` fetch and in `Subject.jsx`'s own create/update/delete calls. Express routing is case-sensitive by default (and isn't configured otherwise here), so **none of these requests ever reach the backend's subject handlers** - every one 404s. The Courses, Students, and Teachers routes don't have this problem (both sides consistently use lowercase paths for those three) - Subjects is the one resource where this mismatch exists, and it breaks all four of its operations. See `04-frontend-app.mdx` for the full request-by-request comparison.
+
+**2. Authentication is real on the backend but decorative everywhere else.** `checkUserLogin` (`backend/components/user.js`) does genuine `bcrypt.compare` password verification and signs a real JWT on success. But:
+
+- The frontend's `Login.jsx` receives that JWT in the response and **never stores it** - only a plain `isAuthenticated: "true"` string and the user object go into `localStorage`.
+- `ProtectedRoute.jsx` (the frontend's route guard) checks nothing but that `localStorage` string - not a token, not an expiry, nothing that can't be set by hand in the browser's dev tools.
+- No request from the frontend to any course/student/teacher/subject endpoint ever attaches an `Authorization` header (confirmed - `AppContext.jsx` and every page's `axios` calls are all bare, header-free requests).
+- No route on the backend - outside of login/register themselves - ever calls `jwt.verify` or checks for a token at all. There's no auth middleware anywhere in `backend/`.
+
+So the JWT exists, gets correctly signed, and is then immediately discarded by the one piece of code that receives it - and even if it weren't discarded, nothing downstream would check it. In its current state, every backend route beyond login/register is reachable by anyone who knows the URL, logged in or not. See `03-authentication.mdx` for the full trace.
+
+## Stack
+
+- **Backend**: Node/Express 5, `mysql2` (raw parameterized SQL queries, no ORM), `bcrypt` for password hashing, `jsonwebtoken` for the (currently unused-downstream) login token, `cors`, `dotenv`
+- **Frontend**: React 19 + Vite, React Router v7, Tailwind CSS v4, `axios`, `react-icons`
+
+## Hardcoded database credentials
+
+`backend/config/db.js` connects to MySQL with `host: "localhost"`, `user: "root"`, `password: "admin"`, `database: "CMS"` - hardcoded directly in source rather than read from environment variables, even though `dotenv` is a dependency and is used elsewhere (`JWT_SECRET`, `PORT`). This is a local development root/admin combination rather than a remote production credential, so the practical exposure is low, but it's inconsistent with the rest of the codebase's env-var usage and worth moving to `.env` alongside the other configuration.
+
+`backend/.gitignore` does list `config/` as ignored (so this file normally wouldn't be committed), but it's present in this checkout regardless - the same pattern seen with other projects in this set where a gitignored file still ended up in the exported zip.
+
+## Running locally
+
+Backend:
+```bash
+cd backend
+npm install
+# create a .env with PORT and JWT_SECRET - neither has a committed example file
+npm run dev
+```
+
+There's no `backend/.env` or `.env.example` in this checkout - `process.env.PORT` will be `undefined` unless one is created, and `JWT_SECRET` falls back to a hardcoded default string if unset.
+
+Frontend:
+```bash
+cd react
+npm install
+npm run dev
+```
+
+The frontend has no configurable API base URL - every page and `AppContext.jsx` hardcodes `http://localhost:5050` directly in each `axios` call, so the backend must be running on port 5050 specifically for the frontend to work at all.
+
+## Top-level structure
+
+| Path | Purpose |
+| --- | --- |
+| `backend/app.js` | Express app entry - mounts all 5 routers under `/api` |
+| `backend/config/db.js` | MySQL connection (hardcoded credentials) |
+| `backend/components/*.js` | Route handler logic, one file per resource |
+| `backend/routes/*.js` | Route registration, one file per resource - see `02-backend-api.mdx` |
+| `react/src/App.jsx` | Route tree, lazy-loaded pages, `ProtectedRoute` wrapping the dashboard layout |
+| `react/src/context/AppContext.jsx` | Shared state + the four "fetch everything on mount" calls (one of which always fails) |
+| `react/src/ProtectedRoute.jsx` | Client-side route guard - see `03-authentication.mdx` |
+| `react/src/pages/*.jsx` | One page per resource, plus `Login`/`Register`/`HomePage`/`Dashboard` |
+| `react/src/components/*.jsx` | `Button`, `Card`, `DataTable`, `SideBar` - shared UI |

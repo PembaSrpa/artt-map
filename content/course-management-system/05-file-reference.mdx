@@ -1,0 +1,40 @@
+---
+title: File Reference
+order: 5
+---
+
+| File | Purpose | Imports from | Imported by |
+| --- | --- | --- | --- |
+| `backend/app.js` | Express app entry, mounts all routers | `express`, `cors`, `dotenv`, `./config/db.js`, all 5 routers | Run via `nodemon app.js` |
+| `backend/config/db.js` | MySQL connection (hardcoded credentials) | `mysql2` | `app.js`, every `components/*.js` |
+| `backend/components/user.js` | `checkUserLogin`, `addUser` - bcrypt + JWT | `bcrypt`, `jsonwebtoken`, `../config/db.js` | `routes/userRouter.js` |
+| `backend/components/course.js` | Course CRUD handlers | `../config/db.js` | `routes/courseRouter.js` |
+| `backend/components/student.js` | Student CRUD handlers (missing `affectedRows` checks on update/delete) | `../config/db.js` | `routes/studentRouter.js` |
+| `backend/components/teacher.js` | Teacher CRUD handlers | `../config/db.js` | `routes/teacherRouter.js` |
+| `backend/components/subject.js` | Subject CRUD handlers (missing `affectedRows` checks on update/delete; camelCase routes - see `02-backend-api.mdx`) | `../config/db.js` | `routes/subjectRouter.js` |
+| `backend/routes/userRouter.js` | `/checkUserLogin`, `/addUser` | `../components/user.js` | `app.js` |
+| `backend/routes/courseRouter.js` | Course routes (lowercase) | `../components/course.js` | `app.js` |
+| `backend/routes/studentRouter.js` | Student routes (lowercase) | `../components/student.js` | `app.js` |
+| `backend/routes/teacherRouter.js` | Teacher routes (lowercase) | `../components/teacher.js` | `app.js` |
+| `backend/routes/subjectRouter.js` | Subject routes (camelCase - the mismatch source) | `../components/subject.js` | `app.js` |
+| `react/src/App.jsx` | Route tree, lazy page loading, `ProtectedRoute` wrapping | `react-router-dom`, `./context/AppContext`, `./ProtectedRoute`, all page components | Rendered by `main.jsx` |
+| `react/src/ProtectedRoute.jsx` | Client-side route guard - `localStorage` string check only | `react-router-dom` | `App.jsx` |
+| `react/src/context/AppContext.jsx` | Shared state, 4 fetch-on-mount calls (1 always fails) | `axios` | `App.jsx`, every page that reads `useAppContext` |
+| `react/src/pages/HomePage.jsx` | Public landing page | - | `App.jsx` |
+| `react/src/pages/Login.jsx` | Login form - discards the returned JWT (see `03-authentication.mdx`) | `axios` | `App.jsx` |
+| `react/src/pages/Register.jsx` | Registration form, redirects to `/login` on success | `axios` | `App.jsx` |
+| `react/src/pages/Dashboard.jsx` | Summary cards + recent-items lists from `AppContext` | `../context/AppContext`, `../components/Card` | `App.jsx` |
+| `react/src/pages/Courses.jsx` | Course list + create/update/delete (lowercase paths - working) | `axios`, `../context/AppContext` | `App.jsx` |
+| `react/src/pages/Student.jsx` | Student list + create/update/delete (lowercase paths - working) | `axios`, `../context/AppContext` | `App.jsx` |
+| `react/src/pages/Teacher.jsx` | Teacher list + create/update/delete (lowercase paths - working) | `axios`, `../context/AppContext` | `App.jsx` |
+| `react/src/pages/Subject.jsx` | Subject list + create/update/delete (lowercase paths - broken, see `04-frontend-app.mdx`) | `axios`, `../context/AppContext` | `App.jsx` |
+| `react/src/components/Button.jsx`, `Card.jsx`, `DataTable.jsx`, `SideBar.jsx` | Shared UI | - | Various pages |
+
+## Everything flagged across these pages, in one place
+
+- All four Subjects operations (list/create/update/delete) fail due to a URL-casing mismatch between `subjectRouter.js` and every frontend call - see `01-overview.mdx` and `04-frontend-app.mdx`.
+- Login issues a real JWT that's discarded client-side and never verified server-side on any other route - see `03-authentication.mdx`.
+- Database credentials are hardcoded in `backend/config/db.js` rather than read from environment variables, unlike the rest of the app's configuration.
+- No `backend/.env`/`.env.example` exists - `PORT` is undefined and `JWT_SECRET` falls back to a hardcoded default unless one is created.
+- `student.js`'s and `subject.js`'s update/delete handlers don't check `affectedRows`, so acting on a nonexistent ID still returns a success response.
+- `bcryptjs` is a listed backend dependency alongside `bcrypt`; only `bcrypt` is actually imported anywhere.

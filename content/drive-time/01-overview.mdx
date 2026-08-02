@@ -1,0 +1,76 @@
+---
+title: Overview
+order: 1
+---
+
+DriveTime is a small FastAPI service: submit a trip's distance, time of day, vehicle type, road/weather conditions, and terrain type, and it returns a predicted travel time in minutes/hours from a pre-trained XGBoost regression model. It's built around Nepal-specific routes and conditions (the sample training data uses real Nepal cities and road types).
+
+## The two things most worth knowing before anything else
+
+**1. The API went stateless, but the database code is still sitting in the repo.** `app/main.py`'s FastAPI app is titled `"Stateless ML-Powered Vehicle Travel Time Estimator"` (version `1.1.0`), and its `/health` route has a code comment reading `# Removed DB check to prevent crashes after Supabase deletion`. `main.py` never imports `app/database.py` or `app/models.py` at all - the live app loads the pickled model and predicts entirely in memory, with no database read or write anywhere in its actual request path. Meanwhile, `app/database.py`, `app/models.py` (the `TripData`/`PredictionLog` tables), `create_tables.py`, `seed_database.py`, and `railway_setup.py` are all still present and still fully written against a Postgres database that, per that comment, no longer exists. See `05-the-unused-database-layer.mdx`.
+
+**2. The API requires a field the model never learned to use.** `PredictionRequest` (in `app/schemas.py`) requires a `road_type` field, added with the comment `# CRITICAL ADDITION FOR NEPAL DATA`, and `main.py`'s `/predict` handler comments that `road_type` is included "for better Nepal accuracy." But the actual `predict.py` preprocessing step never reads `road_type` at all, and the committed `models/feature_names.pkl` confirms the trained model only knows about 6 features - `road_type` isn't one of them. Every prediction the API returns today is computed with zero regard for whether the trip is on a highway, in a city, or on a mountain road, despite the API requiring that information from every caller. See `03-schema-vs-model-mismatch.mdx` for the full evidence trail, including two more request values (`vehicle_type: "suv"`/`"van"` and `weather_condition: "snow"`) that the schema accepts but that would cause the model to fail at prediction time.
+
+## What it does when it works
+
+- **`POST /predict`** - the only real endpoint. Takes trip features, returns `predicted_time_minutes`/`predicted_time_hours`, and echoes the input back as `input_features`.
+- **`GET /health`** - reports whether the model loaded successfully at startup.
+- **`GET /`** - a small JSON welcome message listing the other endpoints.
+- **`GET /docs`** / **`GET /redoc`** - FastAPI's automatic interactive API documentation.
+
+There's no authentication on any route, and no rate limiting.
+
+## Stack
+
+- **FastAPI** + **Uvicorn**, **Pydantic v2** for request/response validation
+- **XGBoost** (`XGBRegressor`) for the actual prediction model, trained offline and loaded from a pickle file at startup
+- **scikit-learn**'s `LabelEncoder` for the three categorical features the model does use (`vehicle_type`, `road_condition`, `weather_condition`)
+- **SQLAlchemy** + **`psycopg2-binary`** (Postgres driver) - present in `requirements.txt` and still fully implemented in `app/database.py`/`app/models.py`, but not used by the running API - see the note above
+- **`pandas`**/**`numpy`** for the offline data-generation and training scripts
+
+## Running locally
+
+```bash
+pip install -r requirements.txt
+python generate_nepal_data.py       # or generate_data.py - see 04-model-training-and-data.mdx
+python app/ml/train.py              # writes models/xgboost_model.pkl, label_encoders.pkl, feature_names.pkl
+uvicorn app.main:app --reload
+```
+
+Visiting `http://localhost:8000/docs` gives an interactive form for `/predict` - which, unlike the README's own documented example request, will show `road_type` as a required field (see `03-schema-vs-model-mismatch.mdx`).
+
+## The README's example request would be rejected by the actual API
+
+The README's `POST /predict` example body doesn't include `road_type`:
+
+```json
+{
+  "distance_km": 200,
+  "traffic_hours": 8.5,
+  "vehicle_avg_speed": 70,
+  "vehicle_type": "car",
+  "road_condition": "good",
+  "weather_condition": "clear"
+}
+```
+
+Since `PredictionRequest.road_type` has no default (`Field(...)`), submitting exactly this body against the current API returns a `422 Unprocessable Entity` validation error, not the response the README shows underneath it. The project's own `test_api.py` script has the identical gap - it also omits `road_type` from every request it sends, so running `python test_api.py` against the current API would fail at the very first prediction call.
+
+## The README's "90% accuracy" claim isn't demonstrated anywhere in this repo
+
+`train.py` computes and prints MAE/RMSE/R2 on a held-out test split every time it's run, but nothing in this codebase records or asserts a specific number, let alone "90% accuracy" - and R2 and "accuracy" aren't even the same kind of metric for a regression task (accuracy is a classification concept). Whatever specific number backs that README claim would have come from a particular training run's printed output, not from anything checked into this repository.
+
+## Top-level structure
+
+| Path | Purpose |
+| --- | --- |
+| `app/main.py` | FastAPI app - `/`, `/health`, `/predict` |
+| `app/schemas.py` | Pydantic request/response models |
+| `app/ml/predict.py` | `TravelTimePredictor` - loads the pickled model, preprocesses input, predicts |
+| `app/ml/train.py` | Offline training script - reads `data/sample_data.csv`, writes the 3 `models/*.pkl` files |
+| `app/database.py`, `app/models.py` | SQLAlchemy engine/session + `TripData`/`PredictionLog` tables - unused by the live app, see `05-the-unused-database-layer.mdx` |
+| `data/sample_data.csv` | 5,000-row training set actually used by the committed model - see `04-model-training-and-data.mdx` for which generator produced it |
+| `generate_data.py`, `generate_nepal_data.py` | Two different synthetic-data generators with different category sets - see `04-model-training-and-data.mdx` |
+| `create_tables.py`, `seed_database.py`, `railway_setup.py` | Database setup/seed scripts for the now-disconnected Postgres layer |
+| `models/xgboost_model.pkl`, `label_encoders.pkl`, `feature_names.pkl` | The committed, pre-trained model artifacts the live API loads |
+| `test_api.py` | A manual `requests`-based smoke test script - currently broken against the live schema, see above |

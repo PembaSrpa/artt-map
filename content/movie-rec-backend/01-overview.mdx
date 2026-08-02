@@ -1,0 +1,61 @@
+---
+title: Overview
+order: 1
+---
+
+This is a FastAPI backend (no README in this repo) powering two features: a content-based movie/book recommendation engine, and an Akinator-style "guess the character" game. It's built for a separate frontend (`app/main.py`'s CORS origins reference deployed Vercel/Render URLs for a `movie-recommendation-frontend`), stores its catalog in Postgres, and populates that catalog from TMDB, Google Books, and hand-tagged character data via a set of offline scripts.
+
+## The two most important things to know first
+
+**Two of the API's own listed endpoints are broken and will 500 on every call.** `GET /api/movies` and `GET /api/books` (both explicitly listed in the root `/` route's own `endpoints` dict) each do `from app.database.crud import get_all_movies, get_movies_by_genre` and `from app.database.crud import get_all_books, get_books_by_category` respectively, inside the route function body. Neither `get_movies_by_genre` nor `get_books_by_category` is defined anywhere in `app/database/crud.py` (which only defines `save_movies_bulk`, `save_books_bulk`, `get_movie_stats`, `get_book_stats`, `get_all_movies`, `get_all_books`). Because Python's `from module import a, b` fails as soon as *any* named import is missing, this `ImportError` fires unconditionally the moment either route is called - regardless of whether a `genre`/`category` query parameter was even supplied. Both routes' broad `except Exception` handler catches it and returns a `500`, so the failure is silent from the outside (no server crash, no log-free mystery - just a `500` every time). See `04-api-routes.mdx`.
+
+**Several of the offline data-fetching/seeding scripts are also broken**, independently of the above - a missing `init_db` function, a missing `fetch_diverse_collection` method, and a couple of quiet data-loss bugs (poster images and book metadata that silently never get saved). See `05-broken-setup-and-seed-scripts.mdx` for the full, directly-verified list.
+
+None of this is guesswork - each claim above was confirmed by grepping every definition and every call site across the whole repository, not inferred from behavior.
+
+## What works
+
+- **`POST /api/recommendations`** - weighted content-based scoring across genre/decade/mood/setting/rating preferences - see `02-recommendation-engine.mdx`.
+- **`GET /api/movies/{id}/similar`** - item-to-item similarity via a hand-written weighted formula (genre Jaccard overlap + decade/rating/popularity proximity) - see `02-recommendation-engine.mdx`.
+- **`GET /api/trending/movies`** - popularity-sorted movies.
+- **`POST /api/game/start`**, **`POST /api/game/answer`**, **`GET /api/game/characters`** - the guessing game, a fixed 7-question decision tree filtering a `Character` table - see `03-guessing-game.mdx`.
+- **`GET /health`** - reports DB connectivity and row counts for movies/books/characters.
+
+## Stack
+
+- **FastAPI** + **Uvicorn**, **SQLAlchemy**, **Postgres** (`psycopg2-binary`), **Pydantic v2**
+- **`alembic`** is a listed dependency but there's no `alembic/` migrations directory or `alembic.ini` anywhere in this repo - tables are created ad hoc by calling `Base.metadata.create_all` directly (when that code path works - see below), not through migrations.
+- **`scikit-learn`** and **`scipy`** are listed dependencies, but neither is imported anywhere in the codebase - the recommendation and similarity "engines" are entirely hand-written weighted-scoring functions (Jaccard set overlap, linear weighted sums), not `cosine_similarity`/`TfidfVectorizer`-based content vectors despite what "content-based recommendation system" might suggest.
+- **`requests`** + **`pandas`** for the TMDB/Google Books fetch scripts
+
+## Two separate `declarative_base()` instances
+
+`app/database/db.py` defines its own `Base = declarative_base()`, and `app/database/models.py` defines a **second, independent** `Base = declarative_base()` that all four actual tables (`Movie`, `Book`, `Character`, `GameSession`) are declared against. `app/main.py` and every script that calls `Base.metadata.create_all` imports `Base` from `app.database.models` (the one the tables actually use), so this happens to work correctly in practice - but `db.py`'s own `Base` is simply unused, orphaned code, not a second source of truth anything currently depends on.
+
+## A real-looking API key in `.env.example`
+
+`.env.example`'s `TMDB_API_KEY` value looks like a real, working TMDB key rather than a placeholder (`DATABASE_URL` in the same file, by contrast, correctly uses placeholder values like `user:password@host:port/dbname`). TMDB keys are low-stakes compared to a database credential - they're rate-limited and scoped to public movie-metadata reads - but since `.env.example` is the file people conventionally *do* commit and share, it's worth swapping in a placeholder there too and rotating the key if it's still active. This documentation does not reproduce the value.
+
+## Running locally
+
+```bash
+pip install -r requirements.txt
+# Set DATABASE_URL, TMDB_API_KEY in a .env file
+python init_database.py       # currently broken - see 05-broken-setup-and-seed-scripts.mdx
+uvicorn app.main:app --reload
+```
+
+## Top-level structure
+
+| Path | Purpose |
+| --- | --- |
+| `app/main.py` | FastAPI app, CORS, `/`, `/health` |
+| `app/routes/recommendations.py`, `app/routes/guessing.py` | The actual API routes - see `04-api-routes.mdx` |
+| `app/models/recommendations.py` | `RecommendationEngine` - hand-written scoring, not ML - see `02-recommendation-engine.mdx` |
+| `app/models/guessing_game.py` | `CharacterGuessingGame` - the decision-tree guessing logic - see `03-guessing-game.mdx` |
+| `app/database/models.py` | `Movie`, `Book`, `Character`, `GameSession` SQLAlchemy tables |
+| `app/database/db.py`, `app/database/crud.py` | Engine/session setup and direct DB read/write functions - see the missing-function issues above |
+| `app/services/tmdb_service.py`, `app/services/books_service.py` | TMDB and Google Books API clients used by the seed scripts |
+| `init_database.py`, `seed_production_db.py`, `fetch_and_save_movies.py`, `fetch_and_save_books.py`, `fetch_actors.py`, `fetch_anime_characters.py`, `seed_characters.py`, `tag_characters.py`, `expand_data.py`, `fix_books.py` | Offline data-population scripts, several of them currently broken - see `05-broken-setup-and-seed-scripts.mdx` |
+| `data/*.json` | Hand-curated/scraped character seed data for the guessing game |
+| `test_*.py` (5 files) | See `05-broken-setup-and-seed-scripts.mdx` and `06-file-reference.mdx` for what each actually covers |

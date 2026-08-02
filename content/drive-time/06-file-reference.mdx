@@ -1,0 +1,32 @@
+---
+title: File Reference
+order: 6
+---
+
+| File | Purpose | Imports from | Imported by |
+| --- | --- | --- | --- |
+| `app/main.py` | FastAPI app - `/`, `/health`, `/predict` | `app.schemas`, `app.ml.predict` | Run via `uvicorn app.main:app` (`Procfile`) |
+| `app/schemas.py` | `PredictionRequest`/`PredictionResponse`/`HealthResponse` Pydantic models | - | `app/main.py` |
+| `app/ml/predict.py` | `TravelTimePredictor` - model loading, preprocessing, prediction | `pickle`, `pandas` | `app/main.py` |
+| `app/ml/train.py` | Offline training script | `xgboost`, `sklearn`, `pandas` | Run manually (`python app/ml/train.py`) |
+| `app/database.py` | SQLAlchemy engine/session setup | `sqlalchemy`, `dotenv` | `app/models.py`, `create_tables.py`, `seed_database.py`, `railway_setup.py` - not `app/main.py` |
+| `app/models.py` | `TripData`, `PredictionLog` SQLAlchemy models | `app.database` | `create_tables.py`, `seed_database.py`, `railway_setup.py` - not `app/main.py` |
+| `create_tables.py` | Creates the (currently unused) Postgres tables | `app.database`, `app.models` | Run manually |
+| `seed_database.py` | Seeds `trip_data` from `data/sample_data.csv` | `app.database`, `app.models`, `pandas` | Run manually |
+| `railway_setup.py` | Railway release-phase script - creates tables + seeds if empty | `app.database`, `app.models`, `pandas` | Run via `Procfile`'s `release:` line |
+| `generate_data.py` | Generic (non-Nepal) synthetic data generator | `pandas`, `numpy` | Run manually - not what produced the committed CSV |
+| `generate_nepal_data.py` | Nepal-specific synthetic data generator - produced `data/sample_data.csv` | `pandas`, `numpy` | Run manually |
+| `data/sample_data.csv` | 5,000-row training set, includes `road_type` (unused by `train.py`) | - | `app/ml/train.py`, `seed_database.py`, `railway_setup.py` |
+| `models/xgboost_model.pkl` | The fitted `XGBRegressor` the live API loads | - | `app/ml/predict.py` |
+| `models/label_encoders.pkl` | Fitted `LabelEncoder`s for `vehicle_type`/`road_condition`/`weather_condition` | - | `app/ml/predict.py` |
+| `models/feature_names.pkl` | The 6-column feature order the model expects | - | `app/ml/predict.py` |
+| `test_api.py` | Manual `requests`-based smoke test - currently broken (missing `road_type`) | `requests` | Run manually |
+
+## Everything flagged across these pages, in one place
+
+- `road_type` is required by the API and described as important for Nepal accuracy, but is never used by the actual model - see `03-schema-vs-model-mismatch.mdx`.
+- `vehicle_type: "suv"`/`"van"` and `weather_condition: "snow"` all pass schema validation but fail at prediction time with a `500` - see `03-schema-vs-model-mismatch.mdx`.
+- The README's own example request (and `test_api.py`'s requests) omit `road_type` and would be rejected by the current schema - see `01-overview.mdx`.
+- The database layer (`app/database.py`, `app/models.py`, `create_tables.py`, `seed_database.py`, `railway_setup.py`) is fully implemented but entirely disconnected from the live app - see `05-the-unused-database-layer.mdx`.
+- `Procfile`'s `release: python railway_setup.py` step will fail if `DATABASE_URL` isn't set, which could block deployment even though the web process itself no longer needs a database - see `05-the-unused-database-layer.mdx`.
+- The README's "90% accuracy" claim isn't backed by any number recorded in this repository - see `01-overview.mdx`.

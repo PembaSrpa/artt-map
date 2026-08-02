@@ -1,0 +1,34 @@
+---
+title: Frontend App
+order: 4
+---
+
+## Routing (`App.jsx`)
+
+`HomePage`, `Login`, and `Register` are public. Everything else (`Dashboard`, `Courses`, `Students`, `Teachers`, `Subjects`) is nested under a single `ProtectedRoute`-wrapped layout route that renders `SideBar` plus an `Outlet`. All page components are lazily loaded (`React.lazy`) with a shared `Suspense` fallback at the router level.
+
+## `AppContext.jsx` - shared state, fetched once on mount
+
+A single React Context holds `courses`/`students`/`teachers`/`subjects` arrays plus their setters, populated by four `axios.get` calls fired together in one `useEffect` on `AppProvider` mount (`getCourses`, `getStudents`, `getTeachers`, `getSubjects`). Every page that lists a resource reads from this shared state rather than fetching its own list independently - `Courses.jsx`, `Student.jsx`, and `Teacher.jsx` read `courses`/`students`/`teachers` from context and call `setCourses`/`setStudents`/`setTeachers` directly after a successful create/update/delete (an optimistic-ish local update rather than a full context refetch), and `Dashboard.jsx` reads all four arrays purely for its summary cards and "recently added" lists.
+
+## The Subjects request-path comparison
+
+| Operation | Backend route (`subjectRouter.js`) | Frontend call | Matches? |
+| --- | --- | --- | --- |
+| List | `GET /api/getSubject` | `AppContext.jsx`: `GET /api/getsubject` | No - 404 |
+| Create | `POST /api/addSubject` | `Subject.jsx`: `POST /api/addsubject` | No - 404 |
+| Update | `POST /api/updateSubject/:id` | `Subject.jsx`: `POST /api/updatesubject/:id` | No - 404 |
+| Delete | `POST /api/deleteSubject/:id` | `Subject.jsx`: `POST /api/deletesubject/:id` | No - 404 |
+
+Every single Subjects operation fails. Compare this to the equivalent table for Courses (`getcourse`/`createcourse`/`updatecourse`/`deletecourse` on both sides) or Teachers/Students, where the frontend and backend agree on lowercase paths throughout - Subjects is the only resource affected, but for that resource, the feature is completely non-functional: a person can never successfully view, add, edit, or delete a subject through this UI as currently written.
+
+## Visible symptoms
+
+- `subjects` in `AppContext` never gets populated past its initial empty array - `getSubjects`'s `catch` block only logs to the console, so nothing in the UI itself surfaces an error message; the Subjects list, and Dashboard's "Total Subjects"/"Recently Added Subjects" cards, just permanently show empty/zero, which could easily read as "there's no data yet" rather than "this feature is broken."
+- Any attempt to add/edit/delete a subject via `Subject.jsx`'s form would similarly fail silently or via whatever generic error handling that page has around its `axios` calls, rather than a clear "these routes don't exist" message.
+
+## Shared components
+
+- **`Button.jsx`**, **`Card.jsx`** - small styling wrappers with no resource-specific logic.
+- **`DataTable.jsx`** - a generic table renderer used by the Courses/Students/Teachers/Subjects list pages to display their respective arrays in a consistent tabular layout.
+- **`SideBar.jsx`** - the persistent left nav for the protected layout, including the logout button, which simply clears the `isAuthenticated`/`user` `localStorage` entries before navigating to `/login` - consistent with the rest of the app's client-only auth state (see `03-authentication.mdx`).
