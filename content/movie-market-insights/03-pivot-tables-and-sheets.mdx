@@ -1,0 +1,40 @@
+---
+title: PivotTables & the "Q" Sheet
+order: 3
+---
+
+Every PivotTable in this workbook draws from the same shared PivotCache (built from the `Data` sheet's full range, `A1:T5000`), so the seven analysis sheets are all views over one consistent dataset - none of them recompute or re-import data independently.
+
+## What the author says each sheet is for
+
+The `Q` sheet (dimension `A1:P41`, no formulas - just written notes) is a planning/documentation sheet, not a data sheet. It lays out, in the author's own words, the questions this dashboard was built to answer, the three headline KPIs, and a written insight underneath each of the first three charts. Restated here for reference:
+
+**Questions the dashboard sets out to answer:**
+- Does spending more on a movie's budget actually guarantee a higher box office return?
+- Which genres are the most profitable for studios to produce?
+- Has movie popularity increased over the years, or is the industry losing audience engagement?
+- How much of the global movie market is dominated by English-language films versus international cinema?
+- Does a longer runtime lead to higher audience engagement (vote count)?
+- Which production companies have the most "engaged" fanbases based on total vote counts?
+
+**The three KPIs:** total box office scale, total capital invested, and average return per dollar spent.
+
+**Written insights** (paraphrased): the Budget-vs-Revenue scatter shows a "diminishing return" pattern, where mid-tier budgets (roughly $20M-$60M) tend to land in the best ROI range, while $200M+ "mega-budgets" carry disproportionately higher financial risk without a guaranteed payoff. The Genre Profitability bar chart shows Animation and Adventure with the highest revenue *floor* - even their weaker performers tend to out-earn top performers in Drama or Documentary, making genre a strong predictor of revenue potential on its own. The Popularity/Quality combo chart's note (partially cut off in the sheet as saved) describes a "Quality Ceiling" - vote averages have stayed comparatively stable over time even as raw popularity/hype (driven by modern digital marketing) has spiked in recent years, suggesting audience hype and audience rating aren't the same signal.
+
+## The seven pivots
+
+| Sheet | PivotTable | Grouped by (rows) | Values | Answers |
+| --- | --- | --- | --- | --- |
+| `KPI` | `pvtKPI` | (none - single summary) | Sum of `revenue`, Average of `vote_average`, Sum of `budget`, plus a worksheet formula for revenue-per-dollar-of-budget | The three headline KPIs above |
+| `BvsR` | `pvtBvsR` | `original_title` (one row per movie, ~4,800 rows) | Sum of `budget`, Sum of `revenue` | Feeds the per-movie scatter plot - the budget/return question |
+| `PbyGenre` | `pvtPbyGenre` | `Primary_Genre` | Sum of `revenue`, Sum of `budget`, Sum of `Profit` | Which genres are most profitable |
+| `Popularity` | `pvtPopularity` | `Years (release_date)` | Count of `id` (movie count that year), Average of `vote_average` | Has popularity/output grown while quality held steady |
+| `MarketDom` | `pvtMarketDom` | `original_language` | Count of `id` | English vs. international market share |
+| `Runtime` | `pvtRuntime` | `runtime`, grouped into 20-minute bins | Average of `vote_count` | Does runtime correlate with engagement |
+| `Company` | `pvtCompany` | `Primary_Company` (~1,312 distinct companies) | Sum of `vote_count` | Which studios have the most engaged fanbases |
+
+Note that `Popularity`'s pivot doesn't actually aggregate the dataset's own `popularity` column at all - despite the sheet's name, it tracks *movie count* (as a stand-in for the industry's output/attention over time) and *average rating* by year, not the `popularity` field itself. This lines up with the Q sheet's own framing of the question as being about audience engagement and quality trends over time rather than TMDB's specific `popularity` metric.
+
+## Slicer connections
+
+Two slicers exist workbook-wide - `Slicer_Primary_Genre` and `Slicer_Years__release_date` - both defined at the workbook level (visible as `#N/A`-valued defined names, which is normal for slicer-backed named ranges) so they can filter multiple PivotTables/PivotCharts at once rather than being scoped to a single sheet. See `04-dashboard-and-charts.mdx` for where they're actually placed and how they're reset.

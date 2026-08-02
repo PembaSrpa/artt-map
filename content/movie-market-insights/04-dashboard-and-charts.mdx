@@ -1,0 +1,43 @@
+---
+title: Dashboard, Charts & Macros
+order: 4
+---
+
+The `Dashboard` sheet is the one place all six charts live together - confirmed directly from the file structure: all six chart objects (`chart1.xml` through `chart4.xml`, plus `chartEx1.xml`/`chartEx2.xml`) are anchored to the same drawing (`drawing1.xml`), and that drawing is attached only to the Dashboard sheet. None of the six analysis sheets (`KPI`, `BvsR`, `PbyGenre`, `Popularity`, `MarketDom`, `Runtime`, `Company`) has its own copy of a chart - they hold the PivotTables the charts pull data from, but the charts themselves are all consolidated on Dashboard.
+
+## The six charts
+
+| Chart | Type | Title (as saved) | Data source |
+| --- | --- | --- | --- |
+| `chart1` | Scatter | "Budget VS Revenue" (with directional emoji arrows in the saved title) | `BvsR` sheet, ~4,800 points (one per movie) |
+| `chart2` | Bar | "Profitablility" - misspelled as saved | `PbyGenre` sheet, top 8 genre rows |
+| `chart3` | Combo (bar + line, dual axis) | "Popularity(L) and Quality(R) Over Time" | `Popularity` sheet, ~92 years of data (movie count as bars on the left axis, average rating as a line on the right axis) |
+| `chart4` | Area | "Optimal Runtime by Vote" | `Runtime` sheet, the 9 runtime bins |
+| `chartEx1` | Treemap | "Market Dominance by Language" | `MarketDom` sheet, top 5 languages by movie count |
+| `chartEx2` | Treemap | "Production" | `Company` sheet, top 10 production companies |
+
+`chart2`'s bar chart only plots the top 8 rows of `PbyGenre`'s pivot (which itself has up to ~20 genre rows) - the chart's data reference points at a fixed sorted sub-range on the sheet, not the pivot's full row count, so it's effectively a "top genres by profitability" view rather than every genre in the dataset. `chartEx1`/`chartEx2` similarly reference small, separately-placed ranges (the top 5 languages and top 10 companies respectively) rather than their full underlying pivots - both treemaps are curated top-N views, not a treemap of the entire language/company list.
+
+## Slicers on the Dashboard
+
+Both workbook-level slicers (`Slicer_Primary_Genre`, `Slicer_Years__release_date`) are placed on the Dashboard sheet, letting a person filter the whole page by genre and/or release year at once, affecting every connected PivotTable/PivotChart simultaneously.
+
+## The two VBA macros
+
+`vbaProject.bin` contains a single module (`Module1`) with two small macros, each clearing one slicer's active filter selection back to "show everything" - reconstructed from the extracted VBA source text:
+
+```vb
+Sub reset_genre()
+    ' selects a shape, then clears the genre slicer's filter
+    ActiveWorkbook.SlicerCaches("Slicer_Primary_Genre").ClearManualFilter
+End Sub
+
+Sub reset_date()
+    ' selects a shape, then clears the release-year slicer's filter
+    ActiveWorkbook.SlicerCaches("Slicer_Years__release_date").ClearManualFilter
+End Sub
+```
+
+> Note: the compressed VBA source wasn't fully decompiled for this documentation pass - the `ClearManualFilter` call against each named `SlicerCache` is directly confirmed from the extracted text, but the exact `ActiveSheet.Shapes.Range(...)` selection step each macro performs first (referencing a specific shape name) wasn't fully recovered, so the snippet above is a reconstruction of the confirmed behavior rather than a byte-exact transcription.
+
+These are almost certainly wired to two small "Reset" buttons/shapes on the Dashboard sheet, given their names and effect - a simple, sensible dashboard UX convenience so a person can clear an applied genre or year filter without manually deselecting every slicer item.

@@ -1,0 +1,38 @@
+---
+title: Component Reference
+order: 5
+---
+
+This workbook is one file, so there's no source-file tree to list - instead, this is a flat reference of every named component inside it, in the same spirit as the file-reference tables used for the coded projects in this set.
+
+| Component | Type | Lives on | Purpose |
+| --- | --- | --- | --- |
+| `Table2` (M query) | Power Query | Embedded in the workbook's DataMashup package | Extracts `Primary_Genre` from the raw `genres` JSON-like text |
+| `Table4` (M query) | Power Query | Embedded in the workbook's DataMashup package | Extracts `Primary_Company` from the raw `production_companies` JSON-like text |
+| `Table2` (Excel Table) | Table, `B1:B4804` | `Data` | Wraps the raw `genres` column as the M query's input |
+| `Table4` (Excel Table) | Table, `J1:J4804` | `Data` | Wraps the raw `production_companies` column as the M query's input |
+| `Table2_1` (Excel Table) | Table, `V1:V4804` | `Data` | The `Primary_Genre` query's output |
+| `Table4_1` (Excel Table) | Table, `W1:W4804` | `Data` | The `Primary_Company` query's output |
+| `ThisWorkbookDataModel` | Connection | Workbook-level | The Excel Data Model (Power Pivot) connection backing the PivotTables |
+| PivotCache (`pivotCacheDefinition1.xml`) | Shared cache | Workbook-level | 26 fields (20 raw + `Profit`/`Primary_Genre`/`Primary_Company`/3 date-grouping variants); every PivotTable reads from this one cache |
+| `pvtKPI` | PivotTable | `KPI` | See `03-pivot-tables-and-sheets.mdx` |
+| `pvtBvsR` | PivotTable | `BvsR` | See `03-pivot-tables-and-sheets.mdx` |
+| `pvtPbyGenre` | PivotTable | `PbyGenre` | See `03-pivot-tables-and-sheets.mdx` |
+| `pvtPopularity` | PivotTable | `Popularity` | See `03-pivot-tables-and-sheets.mdx` |
+| `pvtMarketDom` | PivotTable | `MarketDom` | See `03-pivot-tables-and-sheets.mdx` |
+| `pvtRuntime` | PivotTable | `Runtime` | See `03-pivot-tables-and-sheets.mdx` |
+| `pvtCompany` | PivotTable | `Company` | See `03-pivot-tables-and-sheets.mdx` |
+| `chart1`-`chart4`, `chartEx1`-`chartEx2` | Charts | `Dashboard` (all 6, via one shared drawing) | See `04-dashboard-and-charts.mdx` |
+| `Slicer_Primary_Genre` | Slicer | `Dashboard` | Filters every connected PivotTable by `Primary_Genre` |
+| `Slicer_Years__release_date` | Slicer | `Dashboard` | Filters every connected PivotTable by release year |
+| `Module1.reset_genre` | VBA macro | `vbaProject.bin` | Clears the genre slicer's filter |
+| `Module1.reset_date` | VBA macro | `vbaProject.bin` | Clears the year slicer's filter |
+| `Q` sheet content | Plain text notes | `Q` | The author's written questions/KPIs/insights - see `03-pivot-tables-and-sheets.mdx` |
+| `Profit` | Worksheet formula column | `Data` | `revenue` minus `budget`, computed per row (not via Power Query) |
+| KPI ROI formula | Worksheet formula, cell `D4` | `KPI` | Revenue divided by budget - the "average return per $1 spent" KPI |
+
+## Things worth double-checking if this workbook is edited further
+
+- The `Primary_Genre`/`Primary_Company` extraction is text-splitting, not JSON parsing - it depends on the source file's exact JSON field ordering staying the same on any future refresh (see `02-data-source-and-transformations.mdx`).
+- `chart2`'s bar chart and both treemaps reference fixed, separately-placed top-N ranges rather than their full underlying pivots - resizing a pivot won't automatically resize what these three charts show.
+- The workbook's Power Query connections point at an external file, `tmdb_5000_movies.xlsx` - a "Refresh All" will fail or prompt for a new file location if that source file isn't available at its original path.

@@ -1,0 +1,32 @@
+---
+title: Data Source & Transformations
+order: 2
+---
+
+## The `Data` sheet's layout
+
+Columns A through T hold the raw TMDB 5000 dataset as imported (`budget` through `vote_count`, 20 columns). Two more columns are added on top of the raw import:
+
+- **A computed `Profit` column** (`budget`/`revenue` difference) - present as a pivot-cache field (`Profit`) but computed as a plain worksheet formula on the `Data` sheet rather than through Power Query.
+- **Two Power-Query-computed columns, `Primary_Genre` (column V) and `Primary_Company` (column W)** - each the output of a small M query, described below. These are registered as their own Excel Tables (`Table2_1` at `Data!V1:V4804`, `Table4_1` at `Data!W1:W4804`) and as named ranges `ExternalData_1`/`ExternalData_2`.
+
+## Why "Primary" genre and company exist at all
+
+TMDB's raw `genres` and `production_companies` columns aren't single values - each cell holds a JSON-formatted array of objects (e.g. a movie's `genres` cell looks like a list of `{id, name}` pairs such as Action and Adventure, and `production_companies` similarly holds multiple studio names per movie). A PivotTable can't group meaningfully by a field like that directly, so the workbook extracts just the *first* listed genre and the *first* listed production company into two new flat, single-value columns - `Primary_Genre` and `Primary_Company` - that every genre- and company-based PivotTable in the workbook (`PbyGenre`, `Company`) actually groups by.
+
+## How the extraction actually works (the real M code)
+
+The two queries live in the workbook's embedded Power Query package (`Formulas/Section1.m`, inside the DataMashup part of `customXml/item1.xml`) as `Table2` (genres) and `Table4` (production companies). Neither does real JSON parsing - both use a sequence of plain text find-and-replace steps to strip away the JSON punctuation, then split what's left on commas:
+
+**`Table2` (produces `Primary_Genre`)**: reads the raw `genres` text, strips out the JSON-array punctuation and the literal labels `"id":` and `"name": "` (twice each, since the query anticipates the pattern appearing more than once per cell), removes the closing brace and trailing quote/bracket characters, then removes any remaining quote characters - reducing a JSON-looking value down to a plain comma-separated string of alternating numeric IDs and genre names. It then splits that string on commas into up to 12 columns, keeps only the second split segment (which lands on the first genre's *name*, since the first segment is that genre's leading numeric ID), trims whitespace, and renames the result to `Primary_Genre`.
+
+**`Table4` (produces `Primary_Company`)**: the same pattern applied to `production_companies` (which has a slightly different JSON shape - `name` listed before `id`, and up to 22 companies per movie rather than genres' typical few), stripping the equivalent punctuation and the literal labels `id: `/`name: `, splitting into up to 22 columns, and keeping only the *first* segment as `Primary_Company`.
+
+Because this is string manipulation rather than real JSON parsing, it depends on the source data's JSON formatting being consistent (specifically, `id` appearing before `name` in each genre object, and `name` appearing before `id` in each company object, matching the TMDB export's actual field order) - it would silently produce garbled results if a future refresh of the source file ever changed that field ordering or spacing.
+
+## Date and runtime grouping
+
+Rather than a Power-Query step, the `release_date`/`runtime` breakdowns used by several PivotTables come from Excel's native PivotTable field-grouping feature, applied directly to the shared pivot cache:
+
+- **`release_date`** is grouped three ways simultaneously - by month (`Months (release_date)`, 12 buckets plus before/after catch-alls), by quarter (`Quarters (release_date)`, 4 buckets plus catch-alls), and by year (`Years (release_date)`, one bucket per year from 1916 to 2017 plus catch-alls) - all three exist as separate fields in the same pivot cache, so different pivots can group by whichever granularity they need.
+- **`runtime`** is grouped into fixed 20-minute bins from 60 to 200 minutes (60-79, 80-99, and so on up to 180-200), with a `<60 or (blank)` and an `>200` catch-all bucket on either end - 9 bins total, which is exactly the row count `pvtRuntime` uses (see `03-pivot-tables-and-sheets.mdx`).
